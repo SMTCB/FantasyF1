@@ -2,18 +2,15 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Gauge, Mail, Lock, LogIn, UserPlus } from 'lucide-react';
+import { Gauge, Mail, Lock, LogIn } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [displayName, setDisplayName] = useState('');
-    const [isSignUp, setIsSignUp] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
     const router = useRouter();
     const supabase = createClient();
 
@@ -21,28 +18,15 @@ export default function LoginPage() {
         e.preventDefault();
         setLoading(true);
         setError(null);
-        setSuccess(null);
 
         try {
-            if (isSignUp) {
-                const { error } = await supabase.auth.signUp({
-                    email,
-                    password,
-                    options: {
-                        data: { display_name: displayName },
-                    },
-                });
-                if (error) throw error;
-                setSuccess('Check your email for the confirmation link!');
-            } else {
-                const { error } = await supabase.auth.signInWithPassword({
-                    email,
-                    password,
-                });
-                if (error) throw error;
-                router.push('/');
-                router.refresh();
-            }
+            const { error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+            if (error) throw error;
+            router.push('/');
+            router.refresh();
         } catch (err: any) {
             setError(err.message || 'Authentication failed');
         } finally {
@@ -86,22 +70,6 @@ export default function LoginPage() {
                 {/* Auth Card */}
                 <div className="glass-card p-6">
                     <form onSubmit={handleAuth} className="space-y-4">
-                        {isSignUp && (
-                            <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                            >
-                                <label className="data-readout text-[9px] block mb-1.5">DISPLAY NAME</label>
-                                <input
-                                    type="text"
-                                    value={displayName}
-                                    onChange={(e) => setDisplayName(e.target.value)}
-                                    placeholder="Your racing alias"
-                                    className="input-field"
-                                    required
-                                />
-                            </motion.div>
-                        )}
 
                         <div>
                             <label className="data-readout text-[9px] block mb-1.5">EMAIL</label>
@@ -144,16 +112,6 @@ export default function LoginPage() {
                             </motion.div>
                         )}
 
-                        {success && (
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                className="text-xs text-[var(--color-success)] bg-[var(--color-success)]/10 border border-[var(--color-success)]/20 rounded-lg p-3"
-                            >
-                                {success}
-                            </motion.div>
-                        )}
-
                         <button
                             type="submit"
                             disabled={loading}
@@ -161,11 +119,6 @@ export default function LoginPage() {
                         >
                             {loading ? (
                                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            ) : isSignUp ? (
-                                <>
-                                    <UserPlus size={14} />
-                                    CREATE ACCOUNT
-                                </>
                             ) : (
                                 <>
                                     <LogIn size={14} />
@@ -174,21 +127,6 @@ export default function LoginPage() {
                             )}
                         </button>
                     </form>
-
-                    <div className="mt-4 text-center">
-                        <button
-                            onClick={() => {
-                                setIsSignUp(!isSignUp);
-                                setError(null);
-                                setSuccess(null);
-                            }}
-                            className="text-xs text-[var(--color-carbon-400)] hover:text-[var(--color-carbon-200)] transition-colors"
-                        >
-                            {isSignUp
-                                ? 'Already have an account? Sign in'
-                                : "Don't have an account? Sign up"}
-                        </button>
-                    </div>
                 </div>
 
                 {/* Footer */}
