@@ -1,29 +1,51 @@
+require('dotenv').config({ path: '.env.local' });
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = 'https://jokcixazvunvwojwzied.supabase.co';
-const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impva2NpeGF6dnVudndvand6aWVkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Mjc4NjE3NCwiZXhwIjoyMDg4MzYyMTc0fQ.Mz-XdC-sHsHVgzIxfDbTwmovtnTqnvGGEH3XY-5aVso';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+    console.error('Missing environment variables: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+    process.exit(1);
+}
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-async function applyMigration() {
-    console.log('Applying migration to Supabase...');
+async function applyFixes() {
+    console.log("Applying RLS fixes via REST (as a workaround for DDL)...");
 
-    // We'll use multiple rpc calls if we had them, OR we can try to use the SQL API directly via fetch if enabled.
-    // However, most reliable way to add columns via the client is a hacky execute or checking if they exist via query and then...
-    // Actually, Supabase doesn't allow raw SQL via the standard JS client easily for security.
+    // Note: Since we cannot run raw DDL via the JS client easily, 
+    // we use the Service Key to perform the initial state setup if needed.
+    // However, the real fix for RLS MUST happen in the SQL Editor or via a migration.
 
-    // Let's try to see if we can at least insert the year_results row first to see if service role works.
-    const { data: insertData, error: insertError } = await supabase
+    // If 'apply_migration' fails, it's likely a project permission issue for my MCP account.
+    // I will try to use the REST API to force the columns/rows if they are missing.
+
+    const { data, error } = await supabase
         .from('year_results')
         .upsert({ season: 2026, is_bets_locked: false }, { onConflict: 'season' });
 
-    if (insertError) {
-        console.error('Error with upsert (likely missing column or table):', insertError.message);
+    if (error) {
+        console.error('Error during upsert:', error.message);
     } else {
-        console.log('Upsert successful (or partly successful).');
+        console.log('Upsert successful.');
     }
 
-    console.log('Note: Admin-level DDL (ALTER TABLE) usually requires the SQL Editor or the Management API.');
+    console.log("IMPORTANT: RLS policies MUST be applied via the Supabase SQL Editor if the MCP tool fails.");
+    console.log("SQL to run in Dashboard:");
+    console.log(`
+        ALTER TABLE public.races ENABLE ROW LEVEL SECURITY;
+        DROP POLICY IF EXISTS "Public can view races" ON public.races;
+        CREATE POLICY "Public can view races" ON public.races FOR SELECT USING (true);
+        DROP POLICY IF EXISTS "Anyone can update races" ON public.races;
+        CREATE POLICY "Anyone can update races" ON public.races FOR UPDATE USING (true);
+
+        ALTER TABLE public.year_results ENABLE ROW LEVEL SECURITY;
+        DROP POLICY IF EXISTS "Public can view year_results" ON public.year_results;
+        CREATE POLICY "Public can view year_results" ON public.year_results FOR SELECT USING (true);
+        DROP POLICY IF EXISTS "Anyone can update year_results" ON public.year_results;
+        CREATE POLICY "Anyone can update year_results" ON public.year_results FOR UPDATE USING (true);
+    `);
 }
 
-applyMigration();
+applyFixes();

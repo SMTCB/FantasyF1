@@ -11,19 +11,20 @@
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.5",
+    "@tailwindcss/postcss": "^4.2.1",
     "framer-motion": "^12.6.3",
     "lucide-react": "^0.487.0",
     "next": "^16.1.6",
+    "postcss": "^8.5.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "tailwindcss": "^4.2.1",
-    "@tailwindcss/postcss": "^4.2.1",
-    "postcss": "^8.5.3"
+    "tailwindcss": "^4.2.1"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
+    "dotenv": "^17.3.1",
     "typescript": "^5.8.3"
   }
 }
