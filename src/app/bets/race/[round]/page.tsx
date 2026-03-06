@@ -18,7 +18,7 @@ import {
     Users,
 } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
-import { getRaceByRound, ALL_DRIVERS, TEAMS, RACE_BET_SCORING } from '@/lib/f1-data';
+import { getRaceByRound, ALL_DRIVERS, TEAMS, RACE_BET_SCORING, getNextRace } from '@/lib/f1-data';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect } from 'react';
@@ -113,9 +113,18 @@ export default function RaceBetPage() {
                 .single();
 
             if (raceData) {
+                const nextRace = getNextRace();
+                const isNext = nextRace && race?.round === nextRace.round;
                 const autoLocked = raceData.session_start ? isBetLocked(raceData.session_start) : false;
-                // If it's manually unlocked, it's NOT locked. Otherwise follow auto-lock.
-                setIsRaceLocked(raceData.is_manual_unlock ? false : autoLocked);
+
+                // A race is locked IF:
+                // 1. It is NOT the current upcoming race (isNext is false)
+                // 2. OR it is the current race but has automatically closed (autoLocked is true)
+                // UNLESS: The admin has manually forced it open (is_manual_unlock is true)
+                const isNaturallyLocked = !isNext || autoLocked;
+                const locked = raceData.is_manual_unlock ? false : isNaturallyLocked;
+
+                setIsRaceLocked(locked);
                 setIsLockForced(raceData.is_manual_unlock);
             }
             setLoading(false);
