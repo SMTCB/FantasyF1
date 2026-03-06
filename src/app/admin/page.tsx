@@ -321,12 +321,12 @@ export default function AdminPage() {
                     driverP2: bet.driver_p2,
                     driverP3: bet.driver_p3,
                     constructorChampion: bet.constructor_champion,
-                    last_constructor: bet.last_constructor,
-                    fewest_finishers_race: bet.fewest_finishers_race,
-                    most_dnfs_driver: bet.most_dnfs_driver,
-                    first_driver_replaced: bet.first_driver_replaced,
-                    most_poles: bet.most_poles,
-                    most_podiums_no_win: bet.most_podiums_no_win
+                    lastConstructor: bet.last_constructor,
+                    fewestFinishersRace: bet.fewest_finishers_race,
+                    mostDnfsDriver: bet.most_dnfs_driver,
+                    firstDriverReplaced: bet.first_driver_replaced,
+                    mostPoles: bet.most_poles,
+                    mostPodiumsNoWin: bet.most_podiums_no_win
                 };
 
                 const score = scoreYearBet(yearBet, yearResult);
