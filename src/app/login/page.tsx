@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Gauge, Mail, Lock, LogIn } from 'lucide-react';
+import { Gauge, User, Lock, LogIn } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
-    const [email, setEmail] = useState('');
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -20,6 +20,9 @@ export default function LoginPage() {
         setError(null);
 
         try {
+            // Append internal domain to simulate username login
+            const email = username.includes('@') ? username : `${username}@f1.local`;
+
             const { error } = await supabase.auth.signInWithPassword({
                 email,
                 password,
@@ -72,14 +75,14 @@ export default function LoginPage() {
                     <form onSubmit={handleAuth} className="space-y-4">
 
                         <div>
-                            <label className="data-readout text-[9px] block mb-1.5">EMAIL</label>
+                            <label className="data-readout text-[9px] block mb-1.5">USERNAME</label>
                             <div className="relative">
-                                <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-carbon-400)]" />
+                                <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-carbon-400)]" />
                                 <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="email@example.com"
+                                    type="text"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    placeholder="Enter username"
                                     className="input-field pl-9"
                                     required
                                 />
