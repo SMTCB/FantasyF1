@@ -11,14 +11,15 @@ import {
     Save,
     ChevronDown,
     AlertTriangle,
-    Users,
-    CheckCircle,
-    Calendar,
-    Database,
-    Zap,
     DownloadCloud,
     Loader2,
     Lock,
+    Unlock,
+    Zap,
+    CheckCircle,
+    Calendar,
+    Database,
+    Users,
 } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { CALENDAR, ALL_DRIVERS, TEAMS, YEAR_BET_SCORING } from '@/lib/f1-data';
@@ -42,23 +43,35 @@ export default function AdminPage() {
     const [isFetchingApi, setIsFetchingApi] = useState<number | null>(null);
     const [isYearLocked, setIsYearLocked] = useState(false);
     const [isLoadingLock, setIsLoadingLock] = useState(false);
+    const [manualUnlocks, setManualUnlocks] = useState<Record<number, boolean>>({});
     const supabase = createClient();
 
-    // Fetch year lock status
+    // Fetch year lock status and manual race unlocks
     useEffect(() => {
-        const fetchYearLock = async () => {
-            const { data, error } = await supabase
+        const fetchData = async () => {
+            // Year lock
+            const { data: yearData } = await supabase
                 .from('year_results')
                 .select('is_bets_locked')
                 .eq('season', 2026)
                 .single();
 
-            if (!error && data) {
-                setIsYearLocked(data.is_bets_locked);
+            if (yearData) setIsYearLocked(yearData.is_bets_locked);
+
+            // Manual unlocks
+            const { data: raceData } = await supabase
+                .from('races')
+                .select('round, is_manual_unlock');
+
+            if (raceData) {
+                const unlocks: Record<number, boolean> = {};
+                raceData.forEach(r => unlocks[r.round] = r.is_manual_unlock || false);
+                setManualUnlocks(unlocks);
             }
         };
-        fetchYearLock();
+        fetchData();
     }, [supabase]);
+    // Simple PIN auth for admin
 
     // Simple PIN auth for admin
     const handleAuth = () => {
@@ -149,6 +162,23 @@ export default function AdminPage() {
             alert("Failed to fetch from OpenF1 API.");
         } finally {
             setIsFetchingApi(null);
+        }
+    };
+
+    const toggleManualUnlock = async (round: number) => {
+        const newValue = !manualUnlocks[round];
+        try {
+            const { error } = await supabase
+                .from('races')
+                .update({ is_manual_unlock: newValue })
+                .eq('round', round);
+
+            if (error) throw error;
+            setManualUnlocks(prev => ({ ...prev, [round]: newValue }));
+            handleSave(`Race ${round} ${newValue ? 'FORCED OPEN' : 'AUTO-LOCK ACTIVE'}`);
+        } catch (e) {
+            console.error(e);
+            alert("Failed to update race lock override");
         }
     };
 
@@ -277,14 +307,27 @@ export default function AdminPage() {
                                             >
                                                 <div className="px-3 pb-3 border-t border-[var(--color-carbon-700)] pt-3 space-y-3">
 
-                                                    <button
-                                                        onClick={() => handleFetchApi(race.round, race.gp.replace(/ GP.*/, ''), 2026)}
-                                                        disabled={isFetchingApi === race.round}
-                                                        className="btn-secondary w-full text-xs py-2 flex items-center justify-center gap-1.5 mb-2"
-                                                    >
-                                                        {isFetchingApi === race.round ? <Loader2 size={12} className="animate-spin" /> : <DownloadCloud size={12} />}
-                                                        Fetch from F1 API
-                                                    </button>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => handleFetchApi(race.round, race.gp.replace(/ GP.*/, ''), 2026)}
+                                                            disabled={isFetchingApi === race.round}
+                                                            className="btn-secondary flex-1 text-xs py-2 flex items-center justify-center gap-1.5"
+                                                        >
+                                                            {isFetchingApi === race.round ? <Loader2 size={12} className="animate-spin" /> : <DownloadCloud size={12} />}
+                                                            Fetch from F1 API
+                                                        </button>
+                                                        <button
+                                                            onClick={() => toggleManualUnlock(race.round)}
+                                                            className={`telemetry-border px-3 text-[10px] data-readout flex items-center gap-1.5 transition-all ${manualUnlocks[race.round]
+                                                                ? 'bg-[var(--color-success)]/20 border-[var(--color-success)]/40 text-[var(--color-success)]'
+                                                                : 'bg-[var(--color-carbon-800)] border-[var(--color-carbon-700)] text-[var(--color-carbon-500)]'
+                                                                }`}
+                                                            title="Manually unlock bets for this race (overrides auto-lock)"
+                                                        >
+                                                            {manualUnlocks[race.round] ? <Unlock size={12} /> : <Lock size={12} />}
+                                                            {manualUnlocks[race.round] ? 'FORCED OPEN' : 'AUTO-LOCK'}
+                                                        </button>
+                                                    </div>
 
                                                     {/* P1, P2, P3, DNF (Drivers) */}
                                                     {['p1', 'p2', 'p3', 'dnf'].map((field) => (
@@ -462,15 +505,26 @@ export default function AdminPage() {
                                     Special Year Categories
                                 </h3>
                                 {[
-                                    'Race with Fewest Finishers',
-                                    'Driver with Most DNFs',
-                                    'First Driver Replaced',
-                                    'Most Pole Positions',
-                                    'Most Podiums Without a Win',
-                                ].map((label) => (
-                                    <div key={label}>
-                                        <label className="data-readout text-[9px] block mb-1">{label.toUpperCase()}</label>
-                                        <input type="text" placeholder={`Enter ${label.toLowerCase()}...`} className="input-field text-sm" />
+                                    { label: 'Race with Fewest Finishers', type: 'race' },
+                                    { label: 'Driver with Most DNFs', type: 'driver' },
+                                    { label: 'First Driver Replaced', type: 'driver' },
+                                    { label: 'Most Pole Positions', type: 'driver' },
+                                    { label: 'Most Podiums Without a Win', type: 'driver' },
+                                ].map((cat) => (
+                                    <div key={cat.label}>
+                                        <label className="data-readout text-[9px] block mb-1">{cat.label.toUpperCase()}</label>
+                                        <select className="input-field text-sm">
+                                            <option value="">Select...</option>
+                                            {cat.type === 'driver' && ALL_DRIVERS.map(d => (
+                                                <option key={d.name} value={d.name}>{d.name}</option>
+                                            ))}
+                                            {cat.type === 'team' && TEAMS.map(t => (
+                                                <option key={t.shortName} value={t.shortName}>{t.shortName}</option>
+                                            ))}
+                                            {cat.type === 'race' && CALENDAR.map(r => (
+                                                <option key={r.round} value={r.gp}>{r.gp}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                 ))}
                             </div>

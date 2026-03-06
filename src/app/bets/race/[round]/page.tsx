@@ -20,6 +20,9 @@ import {
 import BottomNav from '@/components/BottomNav';
 import { getRaceByRound, ALL_DRIVERS, TEAMS, RACE_BET_SCORING } from '@/lib/f1-data';
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase/client';
+import { useEffect } from 'react';
+import { isBetLocked } from '@/lib/openf1';
 
 function DriverCard({
     driver,
@@ -75,6 +78,50 @@ export default function RaceBetPage() {
     const [search, setSearch] = useState('');
     const [activeSection, setActiveSection] = useState<'podium' | 'extras'>('podium');
     const [submitted, setSubmitted] = useState(false);
+    const [isLockForced, setIsLockForced] = useState(false);
+    const [isRaceLocked, setIsRaceLocked] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const supabase = createClient();
+
+    useEffect(() => {
+        const fetchBetData = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            // 1. Fetch existing bet
+            const { data: bet } = await supabase
+                .from('bets_race')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('round', round)
+                .single();
+
+            if (bet) {
+                setP1(bet.p1);
+                setP2(bet.p2);
+                setP3(bet.p3);
+                setDnf(bet.dnf_driver);
+                setTeamMostPts(bet.team_most_points);
+                setSpecialBet(bet.special_category_answer);
+            }
+
+            // 2. Fetch race lock status & manual override
+            const { data: raceData } = await supabase
+                .from('races')
+                .select('session_start, is_manual_unlock')
+                .eq('round', round)
+                .single();
+
+            if (raceData) {
+                const autoLocked = raceData.session_start ? isBetLocked(raceData.session_start) : false;
+                // If it's manually unlocked, it's NOT locked. Otherwise follow auto-lock.
+                setIsRaceLocked(raceData.is_manual_unlock ? false : autoLocked);
+                setIsLockForced(raceData.is_manual_unlock);
+            }
+            setLoading(false);
+        };
+        fetchBetData();
+    }, [round, supabase]);
 
     if (!race) {
         return (
@@ -100,10 +147,34 @@ export default function RaceBetPage() {
     const selectedPodium = [p1, p2, p3].filter(Boolean);
     const allBetsFilled = p1 && p2 && p3 && dnf && teamMostPts && specialBet;
 
-    const handleSubmit = () => {
-        if (!allBetsFilled) return;
-        // TODO: Submit to Supabase
-        setSubmitted(true);
+    const handleSubmit = async () => {
+        if (!allBetsFilled || isRaceLocked) return;
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { error } = await supabase
+            .from('bets_race')
+            .upsert({
+                user_id: user.id,
+                round: round,
+                p1,
+                p2,
+                p3,
+                dnf_driver: dnf,
+                team_most_points: teamMostPts,
+                special_category_answer: specialBet,
+                updated_at: new Date().toISOString()
+            }, {
+                onConflict: 'user_id, round'
+            });
+
+        if (error) {
+            console.error(error);
+            alert("Failed to save bets. Please try again.");
+        } else {
+            setSubmitted(true);
+        }
     };
 
     return (
@@ -133,8 +204,10 @@ export default function RaceBetPage() {
                                 <span>{raceDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                             </div>
                         </div>
-                        {isPast ? (
+                        {isRaceLocked ? (
                             <span className="lock-indicator locked"><Lock size={10} /> LOCKED</span>
+                        ) : isLockForced ? (
+                            <span className="lock-indicator open text-[var(--color-success)] border-[var(--color-success)]/40"><Zap size={10} /> FORCED OPEN</span>
                         ) : (
                             <span className="lock-indicator open"><Flag size={10} /> OPEN</span>
                         )}
@@ -403,11 +476,11 @@ export default function RaceBetPage() {
                     <div className="pt-6 pb-4">
                         <button
                             onClick={handleSubmit}
-                            disabled={!allBetsFilled}
-                            className="btn-primary w-full py-3 text-sm flex items-center justify-center gap-2"
+                            disabled={!allBetsFilled || isRaceLocked}
+                            className={`btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 ${isRaceLocked ? 'opacity-50 grayscale' : ''}`}
                         >
-                            <Lock size={14} />
-                            LOCK IN RACE BETS
+                            {isRaceLocked ? <Lock size={14} /> : <Zap size={14} />}
+                            {isRaceLocked ? 'BETS LOCKED' : 'LOCK IN RACE BETS'}
                         </button>
                         {!allBetsFilled && (
                             <p className="text-center text-[10px] text-[var(--color-carbon-400)] mt-2 font-mono">

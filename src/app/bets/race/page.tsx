@@ -14,11 +14,26 @@ import {
 } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { CALENDAR, getNextRace } from '@/lib/f1-data';
+import { isBetLocked } from '@/lib/openf1';
+import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 
 export default function RaceBetsIndexPage() {
-    const now = new Date();
     const nextRace = getNextRace();
+    const [manualUnlocks, setManualUnlocks] = useState<Record<number, boolean>>({});
+    const supabase = createClient();
+
+    useEffect(() => {
+        const fetchUnlocks = async () => {
+            const { data } = await supabase.from('races').select('round, is_manual_unlock');
+            if (data) {
+                const unlocks: Record<number, boolean> = {};
+                data.forEach(r => unlocks[r.round] = r.is_manual_unlock || false);
+                setManualUnlocks(unlocks);
+            }
+        };
+        fetchUnlocks();
+    }, [supabase]);
 
     return (
         <main className="min-h-screen pb-24">
@@ -42,74 +57,58 @@ export default function RaceBetsIndexPage() {
             </header>
 
             {/* Race List */}
-            <div className="px-5 pt-4 space-y-2">
-                {CALENDAR.map((race, idx) => {
-                    const raceDate = new Date(race.date);
-                    const isPast = raceDate < now;
-                    const isNext = nextRace?.round === race.round;
+            <div className="px-5 pt-4 space-y-3">
+                {CALENDAR.map((race) => {
+                    const isPast = nextRace && race.round < nextRace.round;
+                    const isNext = nextRace && race.round === nextRace.round;
+                    const isLocked = isPast && !manualUnlocks[race.round];
+                    const isPending = !isPast && !isNext && !manualUnlocks[race.round];
+                    const isActive = isNext || manualUnlocks[race.round];
 
                     return (
-                        <motion.div
+                        <Link
                             key={race.round}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: idx * 0.03 }}
+                            href={`/bets/race/${race.round}`}
+                            className={`block glass-card overflow-hidden group transition-all ${!isActive ? 'opacity-60 pointer-events-none grayscale' : 'hover:border-[var(--color-f1-red)]/30'
+                                }`}
                         >
-                            <Link
-                                href={`/bets/race/${race.round}`}
-                                className={`
-                  glass-card flex items-center gap-3 p-4 transition-all
-                  ${isNext ? 'border-[var(--color-f1-red)]/40' : ''}
-                  ${isPast ? 'opacity-50' : ''}
-                `}
-                            >
-                                {/* Round Badge */}
-                                <div
-                                    className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 font-mono font-bold text-sm"
-                                    style={{
-                                        background: isNext
-                                            ? 'linear-gradient(135deg, var(--color-f1-red), #c20500)'
-                                            : 'rgba(255,255,255,0.06)',
-                                        color: isNext ? 'white' : 'var(--color-carbon-300)',
-                                    }}
-                                >
-                                    R{String(race.round).padStart(2, '0')}
+                            <div className="flex items-center gap-4 p-4">
+                                <div className="w-12 h-12 rounded-lg bg-[var(--color-carbon-800)] flex flex-col items-center justify-center border border-[var(--color-carbon-700)]">
+                                    <span className="data-readout text-[10px] text-[var(--color-carbon-400)]">RD</span>
+                                    <span className="font-bold text-lg leading-none">{race.round}</span>
                                 </div>
 
-                                {/* Race Info */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="font-semibold text-sm flex items-center gap-2">
+                                <div className="flex-1">
+                                    <h3 className="font-bold text-sm group-hover:text-[var(--color-f1-red)] transition-colors">
                                         {race.gp}
-                                        {race.isSaturday && (
-                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--color-warning)]/20 text-[var(--color-warning)] font-mono uppercase tracking-wider">
-                                                SAT
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2 text-[11px] text-[var(--color-carbon-400)] mt-0.5">
-                                        <MapPin size={10} />
-                                        <span>{race.circuit}</span>
-                                        <span className="text-[var(--color-carbon-600)]">•</span>
-                                        <span>{raceDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+                                    </h3>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-[10px] text-[var(--color-carbon-400)]">{race.circuit}</span>
+                                        <span className="w-1 h-1 rounded-full bg-[var(--color-carbon-600)]" />
+                                        <span className="text-[10px] text-[var(--color-carbon-400)]">
+                                            {new Date(race.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                                        </span>
                                     </div>
                                 </div>
 
-                                {/* Status */}
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                    {isPast ? (
-                                        <span className="data-readout text-[9px] text-[var(--color-carbon-500)]">CLOSED</span>
-                                    ) : isNext ? (
-                                        <span className="lock-indicator open">
-                                            <Unlock size={10} />
-                                            OPEN
+                                <div className="flex flex-col items-end gap-1.5">
+                                    {isActive ? (
+                                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-[var(--color-success)]/10 text-[var(--color-success)] border border-[var(--color-success)]/20 uppercase tracking-wider">
+                                            Open
+                                        </span>
+                                    ) : isLocked ? (
+                                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-[var(--color-danger)]/10 text-[var(--color-danger)] border border-[var(--color-danger)]/20 uppercase tracking-wider">
+                                            Locked
                                         </span>
                                     ) : (
-                                        <span className="data-readout text-[9px] text-[var(--color-carbon-500)]">UPCOMING</span>
+                                        <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-[var(--color-carbon-700)] text-[var(--color-carbon-400)] border border-[var(--color-carbon-600)] uppercase tracking-wider">
+                                            Locked
+                                        </span>
                                     )}
-                                    <ChevronRight size={16} className="text-[var(--color-carbon-500)]" />
+                                    <ChevronRight size={14} className="text-[var(--color-carbon-600)]" />
                                 </div>
-                            </Link>
-                        </motion.div>
+                            </div>
+                        </Link>
                     );
                 })}
             </div>
