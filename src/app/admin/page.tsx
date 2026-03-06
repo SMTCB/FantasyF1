@@ -18,10 +18,13 @@ import {
     Zap,
     DownloadCloud,
     Loader2,
+    Lock,
 } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { CALENDAR, ALL_DRIVERS, TEAMS, YEAR_BET_SCORING } from '@/lib/f1-data';
 import { fetchRaceSession, fetchRaceResults } from '@/lib/openf1';
+import { createClient } from '@/lib/supabase/client';
+import { useEffect } from 'react';
 
 type AdminTab = 'results' | 'scores' | 'yearend';
 
@@ -37,6 +40,25 @@ export default function AdminPage() {
         p1?: string; p2?: string; p3?: string; dnf?: string; teamMostPts?: string; special?: string;
     }>>({});
     const [isFetchingApi, setIsFetchingApi] = useState<number | null>(null);
+    const [isYearLocked, setIsYearLocked] = useState(false);
+    const [isLoadingLock, setIsLoadingLock] = useState(false);
+    const supabase = createClient();
+
+    // Fetch year lock status
+    useEffect(() => {
+        const fetchYearLock = async () => {
+            const { data, error } = await supabase
+                .from('year_results')
+                .select('is_bets_locked')
+                .eq('season', 2026)
+                .single();
+
+            if (!error && data) {
+                setIsYearLocked(data.is_bets_locked);
+            }
+        };
+        fetchYearLock();
+    }, [supabase]);
 
     // Simple PIN auth for admin
     const handleAuth = () => {
@@ -127,6 +149,25 @@ export default function AdminPage() {
             alert("Failed to fetch from OpenF1 API.");
         } finally {
             setIsFetchingApi(null);
+        }
+    };
+
+    const toggleYearLock = async () => {
+        setIsLoadingLock(true);
+        try {
+            const { error } = await supabase
+                .from('year_results')
+                .update({ is_bets_locked: !isYearLocked })
+                .eq('season', 2026);
+
+            if (error) throw error;
+            setIsYearLocked(!isYearLocked);
+            handleSave(`Year bets ${!isYearLocked ? 'LOCKED' : 'OPENED'}`);
+        } catch (e) {
+            console.error(e);
+            alert("Failed to update lock status");
+        } finally {
+            setIsLoadingLock(false);
         }
     };
 
@@ -432,6 +473,32 @@ export default function AdminPage() {
                                         <input type="text" placeholder={`Enter ${label.toLowerCase()}...`} className="input-field text-sm" />
                                     </div>
                                 ))}
+                            </div>
+
+                            <div className="telemetry-border p-5 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h3 className="font-bold text-sm">Season Prediction Status</h3>
+                                        <p className="text-[10px] text-[var(--color-carbon-400)]">Global lock for all Year Bets</p>
+                                    </div>
+                                    <button
+                                        onClick={toggleYearLock}
+                                        disabled={isLoadingLock}
+                                        className={`px-4 py-2 rounded-lg data-readout text-[10px] font-bold transition-all border ${isYearLocked
+                                            ? 'bg-[var(--color-danger)]/20 border-[var(--color-danger)]/40 text-[var(--color-danger)]'
+                                            : 'bg-[var(--color-success)]/20 border-[var(--color-success)]/40 text-[var(--color-success)]'
+                                            }`}
+                                    >
+                                        {isLoadingLock ? <Loader2 size={12} className="animate-spin" /> : (isYearLocked ? 'LOCKED' : 'OPEN')}
+                                    </button>
+                                </div>
+                                <div className="flex items-start gap-2 bg-[var(--color-carbon-800)] p-3 rounded-lg border border-[var(--color-carbon-700)]">
+                                    <Lock size={14} className="mt-0.5 text-[var(--color-carbon-400)]" />
+                                    <p className="text-[10px] text-[var(--color-carbon-400)] leading-relaxed">
+                                        When locked, users cannot submit or edit their Year Bets.
+                                        Usually locked before the start of the first race of the season.
+                                    </p>
+                                </div>
                             </div>
 
                             <button className="btn-primary w-full py-3 text-sm flex items-center justify-center gap-2">

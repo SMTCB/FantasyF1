@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { ALL_DRIVERS, TEAMS, CALENDAR } from '@/lib/f1-data';
+import { createClient } from '@/lib/supabase/client';
+import { useEffect } from 'react';
 
 interface BetCategory {
     id: string;
@@ -181,6 +183,25 @@ export default function YearBetsPage() {
     const [bets, setBets] = useState<Record<string, string>>({});
     const [openCategory, setOpenCategory] = useState<string | null>(null);
     const [submitted, setSubmitted] = useState(false);
+    const [isLocked, setIsLocked] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const supabase = createClient();
+
+    useEffect(() => {
+        const checkLock = async () => {
+            const { data, error } = await supabase
+                .from('year_results')
+                .select('is_bets_locked')
+                .eq('season', 2026)
+                .single();
+
+            if (!error && data) {
+                setIsLocked(data.is_bets_locked);
+            }
+            setLoading(false);
+        };
+        checkLock();
+    }, [supabase]);
 
     const totalCategories = YEAR_BET_CATEGORIES.length;
     const filledCategories = Object.keys(bets).length;
@@ -210,7 +231,7 @@ export default function YearBetsPage() {
                                 Year Bets
                             </h1>
                             <span className="data-readout text-[10px] text-[var(--color-carbon-400)]">
-                                2026 SEASON PREDICTIONS · LOCK BEFORE R1
+                                {isLocked ? 'SEASON PREDICTIONS LOCKED' : '2026 SEASON PREDICTIONS · LOCK BEFORE R1'}
                             </span>
                         </div>
                         <div className="telemetry-border px-3 py-1.5">
@@ -255,8 +276,11 @@ export default function YearBetsPage() {
                             >
                                 {/* Category Header */}
                                 <button
-                                    onClick={() => setOpenCategory(isOpen ? null : cat.id)}
-                                    className="w-full flex items-center gap-3 p-4 text-left"
+                                    onClick={() => {
+                                        if (isLocked) return;
+                                        setOpenCategory(isOpen ? null : cat.id);
+                                    }}
+                                    className={`w-full flex items-center gap-3 p-4 text-left ${isLocked ? 'opacity-70 cursor-not-allowed' : ''}`}
                                 >
                                     <div
                                         className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
@@ -351,11 +375,19 @@ export default function YearBetsPage() {
                                 Your year predictions have been submitted. Good luck!
                             </p>
                         </div>
+                    ) : isLocked ? (
+                        <div className="glass-card p-6 text-center border-[var(--color-danger)]/30">
+                            <Lock size={32} className="text-[var(--color-danger)] mx-auto mb-3" />
+                            <h3 className="font-bold text-lg mb-1">Submissions Closed</h3>
+                            <p className="text-sm text-[var(--color-carbon-400)]">
+                                The season has started and year bets are now locked.
+                            </p>
+                        </div>
                     ) : (
                         <button
                             onClick={handleSubmit}
                             disabled={!allFilled}
-                            className="btn-primary w-full py-3 text-sm flex items-center justify-center gap-2"
+                            className={`btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 ${!allFilled ? 'opacity-50 grayscale' : ''}`}
                         >
                             <Lock size={14} />
                             SUBMIT YEAR BETS ({filledCategories}/{totalCategories})
