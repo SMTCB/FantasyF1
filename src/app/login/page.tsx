@@ -21,7 +21,7 @@ export default function LoginPage() {
 
         try {
             // Append internal domain to simulate username login
-            const email = username.includes('@') ? username : `${username}@f1.local`;
+            const email = username.includes('@') ? username : `${username.toLowerCase()}@fantasyf1.com`;
 
             const { error } = await supabase.auth.signInWithPassword({
                 email,
