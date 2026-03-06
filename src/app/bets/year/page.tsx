@@ -188,19 +188,47 @@ export default function YearBetsPage() {
     const supabase = createClient();
 
     useEffect(() => {
-        const checkLock = async () => {
-            const { data, error } = await supabase
+        const fetchYearData = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+
+            // 1. Check lock status
+            const { data: lockData } = await supabase
                 .from('year_results')
                 .select('is_bets_locked')
                 .eq('season', 2026)
                 .single();
 
-            if (!error && data) {
-                setIsLocked(data.is_bets_locked);
+            if (lockData) {
+                setIsLocked(lockData.is_bets_locked);
+            }
+
+            // 2. Fetch existing bets if user is logged in
+            if (user) {
+                const { data: existingBet } = await supabase
+                    .from('bets_year')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .single();
+
+                if (existingBet) {
+                    setBets({
+                        'driver_champion': existingBet.driver_champion,
+                        'driver_p2': existingBet.driver_p2,
+                        'driver_p3': existingBet.driver_p3,
+                        'constructor_champion': existingBet.constructor_champion,
+                        'last_constructor': existingBet.last_constructor,
+                        'fewest_finishers': existingBet.fewest_finishers_race,
+                        'most_dnfs': existingBet.most_dnfs_driver,
+                        'first_replaced': existingBet.first_driver_replaced,
+                        'most_poles': existingBet.most_poles,
+                        'most_podiums_no_win': existingBet.most_podiums_no_win,
+                    });
+                    setSubmitted(true);
+                }
             }
             setLoading(false);
         };
-        checkLock();
+        fetchYearData();
     }, [supabase]);
 
     const totalCategories = YEAR_BET_CATEGORIES.length;

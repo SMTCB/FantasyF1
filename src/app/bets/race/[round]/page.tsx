@@ -103,6 +103,7 @@ export default function RaceBetPage() {
                 setDnf(bet.dnf_driver);
                 setTeamMostPts(bet.team_most_points);
                 setSpecialBet(bet.special_category_answer);
+                setSubmitted(true);
             }
 
             // 2. Fetch race lock status & manual override
@@ -224,22 +225,9 @@ export default function RaceBetPage() {
                 </div>
             </header>
 
-            {submitted ? (
-                <div className="px-5 pt-8">
-                    <div className="glass-card p-8 text-center glow-green">
-                        <CheckCircle size={40} className="text-[var(--color-success)] mx-auto mb-3" />
-                        <h3 className="font-bold text-xl mb-2">Bets Submitted!</h3>
-                        <p className="text-sm text-[var(--color-carbon-300)] mb-4">
-                            Your race predictions for {race.gp} are locked in.
-                        </p>
-                        <Link href="/bets/race" className="btn-secondary inline-block">
-                            Back to Race List
-                        </Link>
-                    </div>
-                </div>
-            ) : (
-                <div className="px-5 pt-4">
-                    {/* Section Tabs */}
+            {/* Main Content Area */}
+            <div className={`px-5 pt-4 ${submitted ? 'opacity-80 pointer-events-none' : ''}`}>
+                {!submitted && !isRaceLocked && (
                     <div className="flex gap-2 mb-5">
                         {(['podium', 'extras'] as const).map((tab) => (
                             <button
@@ -258,247 +246,267 @@ export default function RaceBetPage() {
                             </button>
                         ))}
                     </div>
+                )}
 
-                    <AnimatePresence mode="wait">
-                        {activeSection === 'podium' && (
-                            <motion.div
-                                key="podium"
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: 20 }}
-                            >
-                                {/* Podium Selection Status */}
-                                <div className="grid grid-cols-3 gap-2 mb-5">
-                                    {[
-                                        { label: 'P1', value: p1, pts: RACE_BET_SCORING.EXACT_P1, icon: <Trophy size={14} /> },
-                                        { label: 'P2', value: p2, pts: RACE_BET_SCORING.EXACT_P2, icon: <Medal size={14} /> },
-                                        { label: 'P3', value: p3, pts: RACE_BET_SCORING.EXACT_P3, icon: <Medal size={14} /> },
-                                    ].map((pos) => (
-                                        <div
-                                            key={pos.label}
-                                            className={`telemetry-border p-3 text-center ${pos.value ? 'border-[var(--color-success)]/30' : ''}`}
-                                        >
-                                            <div className="data-readout text-[9px] mb-1 flex items-center justify-center gap-1">
-                                                {pos.icon}
-                                                {pos.label}
-                                            </div>
-                                            <div className="text-xs font-semibold truncate">
-                                                {pos.value || '—'}
-                                            </div>
-                                            <div className="data-readout text-[8px] mt-1 text-[var(--color-success)]">{pos.pts}pts</div>
+                <AnimatePresence mode="wait">
+                    {activeSection === 'podium' && (
+                        <motion.div
+                            key="podium"
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 20 }}
+                        >
+                            {/* Podium Selection Status */}
+                            <div className="grid grid-cols-3 gap-2 mb-5">
+                                {[
+                                    { label: 'P1', value: p1, pts: RACE_BET_SCORING.EXACT_P1, icon: <Trophy size={14} /> },
+                                    { label: 'P2', value: p2, pts: RACE_BET_SCORING.EXACT_P2, icon: <Medal size={14} /> },
+                                    { label: 'P3', value: p3, pts: RACE_BET_SCORING.EXACT_P3, icon: <Medal size={14} /> },
+                                ].map((pos) => (
+                                    <div
+                                        key={pos.label}
+                                        className={`telemetry-border p-3 text-center ${pos.value ? 'border-[var(--color-success)]/30' : ''}`}
+                                    >
+                                        <div className="data-readout text-[9px] mb-1 flex items-center justify-center gap-1">
+                                            {pos.icon}
+                                            {pos.label}
                                         </div>
+                                        <div className="text-xs font-semibold truncate">
+                                            {pos.value || '—'}
+                                        </div>
+                                        <div className="data-readout text-[8px] mt-1 text-[var(--color-success)]">{pos.pts}pts</div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {p1 && p2 && p3 && (
+                                <div className="glass-card p-3 mb-4 text-center text-xs text-[var(--color-success)]">
+                                    🎯 All 3 correct = <strong>+{RACE_BET_SCORING.ALL_PODIUM_BONUS}pts bonus!</strong>
+                                </div>
+                            )}
+
+                            <div className="relative mb-3">
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-carbon-400)]" />
+                                <input
+                                    type="text"
+                                    placeholder="Search driver..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="input-field pl-9 text-sm"
+                                />
+                            </div>
+
+                            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                                {filteredDrivers.map((driver) => {
+                                    const isP1 = p1 === driver.name;
+                                    const isP2 = p2 === driver.name;
+                                    const isP3 = p3 === driver.name;
+                                    const isSelected = isP1 || isP2 || isP3;
+
+                                    return (
+                                        <DriverCard
+                                            key={driver.name}
+                                            driver={driver}
+                                            isSelected={isSelected}
+                                            position={isP1 ? 'P1' : isP2 ? 'P2' : isP3 ? 'P3' : undefined}
+                                            onSelect={() => {
+                                                // Cycle through positions: first click = P1, second = P2, etc.
+                                                if (isP1) { setP1(null); return; }
+                                                if (isP2) { setP2(null); return; }
+                                                if (isP3) { setP3(null); return; }
+                                                if (!p1) { setP1(driver.name); return; }
+                                                if (!p2) { setP2(driver.name); return; }
+                                                if (!p3) { setP3(driver.name); return; }
+                                            }}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {activeSection === 'extras' && (
+                        <motion.div
+                            key="extras"
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            className="space-y-5"
+                        >
+                            {/* DNF Prediction */}
+                            <div>
+                                <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                                    <AlertTriangle size={14} className="text-[var(--color-warning)]" />
+                                    DNF Prediction
+                                    <span className="score-pill text-[9px] ml-auto">{RACE_BET_SCORING.DNF}pts</span>
+                                </h3>
+                                <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto">
+                                    {ALL_DRIVERS.map((driver) => (
+                                        <DriverCard
+                                            key={driver.name}
+                                            driver={driver}
+                                            isSelected={dnf === driver.name}
+                                            onSelect={() => setDnf(dnf === driver.name ? null : driver.name)}
+                                        />
                                     ))}
                                 </div>
+                            </div>
 
-                                {p1 && p2 && p3 && (
-                                    <div className="glass-card p-3 mb-4 text-center text-xs text-[var(--color-success)]">
-                                        🎯 All 3 correct = <strong>+{RACE_BET_SCORING.ALL_PODIUM_BONUS}pts bonus!</strong>
-                                    </div>
-                                )}
-
-                                <div className="relative mb-3">
-                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-carbon-400)]" />
-                                    <input
-                                        type="text"
-                                        placeholder="Search driver..."
-                                        value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
-                                        className="input-field pl-9 text-sm"
-                                    />
-                                </div>
-
-                                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-                                    {filteredDrivers.map((driver) => {
-                                        const isP1 = p1 === driver.name;
-                                        const isP2 = p2 === driver.name;
-                                        const isP3 = p3 === driver.name;
-                                        const isSelected = isP1 || isP2 || isP3;
-
-                                        return (
-                                            <DriverCard
-                                                key={driver.name}
-                                                driver={driver}
-                                                isSelected={isSelected}
-                                                position={isP1 ? 'P1' : isP2 ? 'P2' : isP3 ? 'P3' : undefined}
-                                                onSelect={() => {
-                                                    // Cycle through positions: first click = P1, second = P2, etc.
-                                                    if (isP1) { setP1(null); return; }
-                                                    if (isP2) { setP2(null); return; }
-                                                    if (isP3) { setP3(null); return; }
-                                                    if (!p1) { setP1(driver.name); return; }
-                                                    if (!p2) { setP2(driver.name); return; }
-                                                    if (!p3) { setP3(driver.name); return; }
-                                                }}
+                            {/* Team Most Points */}
+                            <div>
+                                <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                                    <Users size={14} className="text-[var(--color-info)]" />
+                                    Team with Most Points
+                                    <span className="score-pill text-[9px] ml-auto">{RACE_BET_SCORING.TEAM_MOST_POINTS}pts</span>
+                                </h3>
+                                <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                                    {TEAMS.map((team) => (
+                                        <motion.button
+                                            key={team.shortName}
+                                            whileTap={{ scale: 0.97 }}
+                                            onClick={() => setTeamMostPts(teamMostPts === team.shortName ? null : team.shortName)}
+                                            className={`
+                          flex items-center gap-3 p-3 rounded-lg border transition-all text-left w-full
+                          ${teamMostPts === team.shortName
+                                                    ? 'border-[var(--color-f1-red)]/60 bg-[var(--color-f1-red)]/10'
+                                                    : 'border-[var(--color-carbon-700)] bg-[var(--color-carbon-800)]/40 hover:border-[var(--color-carbon-500)]'
+                                                }
+                        `}
+                                        >
+                                            <div
+                                                className="w-3 h-8 rounded-full flex-shrink-0"
+                                                style={{ backgroundColor: team.color }}
                                             />
-                                        );
-                                    })}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-semibold text-sm">{team.shortName}</div>
+                                                <div className="data-readout text-[9px]">{team.drivers.join(' · ')}</div>
+                                            </div>
+                                            {teamMostPts === team.shortName && (
+                                                <CheckCircle size={16} className="text-[var(--color-f1-red)]" />
+                                            )}
+                                        </motion.button>
+                                    ))}
                                 </div>
-                            </motion.div>
-                        )}
+                            </div>
 
-                        {activeSection === 'extras' && (
-                            <motion.div
-                                key="extras"
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -20 }}
-                                className="space-y-5"
-                            >
-                                {/* DNF Prediction */}
-                                <div>
-                                    <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                                        <AlertTriangle size={14} className="text-[var(--color-warning)]" />
-                                        DNF Prediction
-                                        <span className="score-pill text-[9px] ml-auto">{RACE_BET_SCORING.DNF}pts</span>
-                                    </h3>
-                                    <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto">
+                            {/* Special Category */}
+                            <div>
+                                <h3 className="font-semibold text-sm mb-2 flex items-start gap-2">
+                                    <Star size={14} className="text-[var(--color-warning)] mt-1 flex-shrink-0" />
+                                    <div>
+                                        {race.specialCategory.question}
+                                        <div className="data-readout text-[9px] mt-1 text-[var(--color-carbon-400)]">SPECIAL CATEGORY</div>
+                                    </div>
+                                    <span className="score-pill text-[9px] ml-auto">{RACE_BET_SCORING.SPECIAL_CATEGORY}pts</span>
+                                </h3>
+
+                                {race.specialCategory.type === 'driver' && (
+                                    <div className="grid grid-cols-2 gap-2 max-h-[250px] overflow-y-auto">
                                         {ALL_DRIVERS.map((driver) => (
                                             <DriverCard
                                                 key={driver.name}
                                                 driver={driver}
-                                                isSelected={dnf === driver.name}
-                                                onSelect={() => setDnf(dnf === driver.name ? null : driver.name)}
+                                                isSelected={specialBet === driver.name}
+                                                onSelect={() => setSpecialBet(specialBet === driver.name ? null : driver.name)}
                                             />
                                         ))}
                                     </div>
-                                </div>
+                                )}
 
-                                {/* Team Most Points */}
-                                <div>
-                                    <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                                        <Users size={14} className="text-[var(--color-info)]" />
-                                        Team with Most Points
-                                        <span className="score-pill text-[9px] ml-auto">{RACE_BET_SCORING.TEAM_MOST_POINTS}pts</span>
-                                    </h3>
+                                {race.specialCategory.type === 'team' && (
                                     <div className="space-y-2 max-h-[250px] overflow-y-auto">
                                         {TEAMS.map((team) => (
                                             <motion.button
                                                 key={team.shortName}
                                                 whileTap={{ scale: 0.97 }}
-                                                onClick={() => setTeamMostPts(teamMostPts === team.shortName ? null : team.shortName)}
+                                                onClick={() => setSpecialBet(specialBet === team.shortName ? null : team.shortName)}
                                                 className={`
-                          flex items-center gap-3 p-3 rounded-lg border transition-all text-left w-full
-                          ${teamMostPts === team.shortName
+                                                        flex items-center gap-3 p-3 rounded-lg border transition-all text-left w-full
+                                                        ${specialBet === team.shortName
                                                         ? 'border-[var(--color-f1-red)]/60 bg-[var(--color-f1-red)]/10'
                                                         : 'border-[var(--color-carbon-700)] bg-[var(--color-carbon-800)]/40 hover:border-[var(--color-carbon-500)]'
                                                     }
-                        `}
+                                                    `}
                                             >
-                                                <div
-                                                    className="w-3 h-8 rounded-full flex-shrink-0"
-                                                    style={{ backgroundColor: team.color }}
-                                                />
+                                                <div className="w-3 h-8 rounded-full flex-shrink-0" style={{ backgroundColor: team.color }} />
                                                 <div className="flex-1 min-w-0">
                                                     <div className="font-semibold text-sm">{team.shortName}</div>
-                                                    <div className="data-readout text-[9px]">{team.drivers.join(' · ')}</div>
                                                 </div>
-                                                {teamMostPts === team.shortName && (
+                                                {specialBet === team.shortName && (
                                                     <CheckCircle size={16} className="text-[var(--color-f1-red)]" />
                                                 )}
                                             </motion.button>
                                         ))}
                                     </div>
-                                </div>
+                                )}
 
-                                {/* Special Category */}
-                                <div>
-                                    <h3 className="font-semibold text-sm mb-2 flex items-start gap-2">
-                                        <Star size={14} className="text-[var(--color-warning)] mt-1 flex-shrink-0" />
-                                        <div>
-                                            {race.specialCategory.question}
-                                            <div className="data-readout text-[9px] mt-1 text-[var(--color-carbon-400)]">SPECIAL CATEGORY</div>
-                                        </div>
-                                        <span className="score-pill text-[9px] ml-auto">{RACE_BET_SCORING.SPECIAL_CATEGORY}pts</span>
-                                    </h3>
-
-                                    {race.specialCategory.type === 'driver' && (
-                                        <div className="grid grid-cols-2 gap-2 max-h-[250px] overflow-y-auto">
-                                            {ALL_DRIVERS.map((driver) => (
-                                                <DriverCard
-                                                    key={driver.name}
-                                                    driver={driver}
-                                                    isSelected={specialBet === driver.name}
-                                                    onSelect={() => setSpecialBet(specialBet === driver.name ? null : driver.name)}
-                                                />
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {race.specialCategory.type === 'team' && (
-                                        <div className="space-y-2 max-h-[250px] overflow-y-auto">
-                                            {TEAMS.map((team) => (
-                                                <motion.button
-                                                    key={team.shortName}
-                                                    whileTap={{ scale: 0.97 }}
-                                                    onClick={() => setSpecialBet(specialBet === team.shortName ? null : team.shortName)}
-                                                    className={`
-                                                        flex items-center gap-3 p-3 rounded-lg border transition-all text-left w-full
-                                                        ${specialBet === team.shortName
-                                                            ? 'border-[var(--color-f1-red)]/60 bg-[var(--color-f1-red)]/10'
-                                                            : 'border-[var(--color-carbon-700)] bg-[var(--color-carbon-800)]/40 hover:border-[var(--color-carbon-500)]'
-                                                        }
-                                                    `}
-                                                >
-                                                    <div className="w-3 h-8 rounded-full flex-shrink-0" style={{ backgroundColor: team.color }} />
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="font-semibold text-sm">{team.shortName}</div>
-                                                    </div>
-                                                    {specialBet === team.shortName && (
-                                                        <CheckCircle size={16} className="text-[var(--color-f1-red)]" />
-                                                    )}
-                                                </motion.button>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {race.specialCategory.type === 'options' && race.specialCategory.options && (
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {race.specialCategory.options.map((opt) => (
-                                                <motion.button
-                                                    key={opt}
-                                                    whileTap={{ scale: 0.97 }}
-                                                    onClick={() => setSpecialBet(specialBet === opt ? null : opt)}
-                                                    className={`
+                                {race.specialCategory.type === 'options' && race.specialCategory.options && (
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {race.specialCategory.options.map((opt) => (
+                                            <motion.button
+                                                key={opt}
+                                                whileTap={{ scale: 0.97 }}
+                                                onClick={() => setSpecialBet(specialBet === opt ? null : opt)}
+                                                className={`
                                                         p-4 rounded-lg border transition-all font-semibold text-center
                                                         ${specialBet === opt
-                                                            ? 'border-[var(--color-f1-red)]/60 bg-[var(--color-f1-red)]/10 text-white'
-                                                            : 'border-[var(--color-carbon-700)] bg-[var(--color-carbon-800)]/40 text-[var(--color-carbon-300)] hover:border-[var(--color-carbon-500)]'
-                                                        }
+                                                        ? 'border-[var(--color-f1-red)]/60 bg-[var(--color-f1-red)]/10 text-white'
+                                                        : 'border-[var(--color-carbon-700)] bg-[var(--color-carbon-800)]/40 text-[var(--color-carbon-300)] hover:border-[var(--color-carbon-500)]'
+                                                    }
                                                     `}
-                                                >
-                                                    {opt}
-                                                    {specialBet === opt && (
-                                                        <div className="flex justify-center mt-2">
-                                                            <CheckCircle size={16} className="text-[var(--color-f1-red)]" />
-                                                        </div>
-                                                    )}
-                                                </motion.button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                                            >
+                                                {opt}
+                                                {specialBet === opt && (
+                                                    <div className="flex justify-center mt-2">
+                                                        <CheckCircle size={16} className="text-[var(--color-f1-red)]" />
+                                                    </div>
+                                                )}
+                                            </motion.button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
-                    {/* Submit */}
-                    <div className="pt-6 pb-4">
-                        <button
-                            onClick={handleSubmit}
-                            disabled={!allBetsFilled || isRaceLocked}
-                            className={`btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 ${isRaceLocked ? 'opacity-50 grayscale' : ''}`}
-                        >
-                            {isRaceLocked ? <Lock size={14} /> : <Zap size={14} />}
-                            {isRaceLocked ? 'BETS LOCKED' : 'LOCK IN RACE BETS'}
-                        </button>
-                        {!allBetsFilled && (
-                            <p className="text-center text-[10px] text-[var(--color-carbon-400)] mt-2 font-mono">
-                                FILL ALL CATEGORIES TO SUBMIT
+                {/* Submit / Status Area */}
+                <div className="pt-6 pb-4">
+                    {submitted ? (
+                        <div className="glass-card p-6 text-center glow-green">
+                            <CheckCircle size={32} className="text-[var(--color-success)] mx-auto mb-3" />
+                            <h3 className="font-bold text-lg mb-1">Bets Locked In!</h3>
+                            <p className="text-sm text-[var(--color-carbon-300)] mb-4">
+                                Your race predictions for {race.gp} are stored.
                             </p>
-                        )}
-                    </div>
+                            {!isRaceLocked && (
+                                <button
+                                    onClick={() => setSubmitted(false)}
+                                    className="text-[var(--color-f1-red)] text-xs font-bold hover:underline"
+                                >
+                                    EDIT MY BETS
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        <>
+                            <button
+                                onClick={handleSubmit}
+                                disabled={!allBetsFilled || isRaceLocked}
+                                className={`btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 ${isRaceLocked ? 'opacity-50 grayscale' : ''}`}
+                            >
+                                {isRaceLocked ? <Lock size={14} /> : <Zap size={14} />}
+                                {isRaceLocked ? 'BETS LOCKED' : 'LOCK IN RACE BETS'}
+                            </button>
+                            {!allBetsFilled && (
+                                <p className="text-center text-[10px] text-[var(--color-carbon-400)] mt-2 font-mono">
+                                    FILL ALL CATEGORIES TO SUBMIT
+                                </p>
+                            )}
+                        </>
+                    )}
                 </div>
-            )}
+            </div>
 
             <BottomNav />
         </main>
