@@ -16,9 +16,12 @@ import {
     Calendar,
     Database,
     Zap,
+    DownloadCloud,
+    Loader2,
 } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { CALENDAR, ALL_DRIVERS, TEAMS, YEAR_BET_SCORING } from '@/lib/f1-data';
+import { fetchRaceSession, fetchRaceResults } from '@/lib/openf1';
 
 type AdminTab = 'results' | 'scores' | 'yearend';
 
@@ -28,6 +31,12 @@ export default function AdminPage() {
     const [activeTab, setActiveTab] = useState<AdminTab>('results');
     const [expandedRound, setExpandedRound] = useState<number | null>(null);
     const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+    // Results Form State
+    const [resultsForm, setResultsForm] = useState<Record<number, {
+        p1?: string; p2?: string; p3?: string; dnf?: string; teamMostPts?: string; special?: string;
+    }>>({});
+    const [isFetchingApi, setIsFetchingApi] = useState<number | null>(null);
 
     // Simple PIN auth for admin
     const handleAuth = () => {
@@ -82,6 +91,43 @@ export default function AdminPage() {
     const handleSave = (label: string) => {
         setSaveStatus(label);
         setTimeout(() => setSaveStatus(null), 2000);
+    };
+
+    const handleFormChange = (round: number, field: string, value: string) => {
+        setResultsForm(prev => ({
+            ...prev,
+            [round]: {
+                ...(prev[round] || {}),
+                [field]: value
+            }
+        }));
+    };
+
+    const handleFetchApi = async (round: number, country: string, year: number) => {
+        setIsFetchingApi(round);
+        try {
+            const session = await fetchRaceSession(year, country);
+            if (session) {
+                const results = await fetchRaceResults(session.session_key);
+                // Results is an array of objects like { position: 1, driver_number: 1, ... }
+                // For a robust implementation, you would map driver_number to driver names.
+                // For now, let's just show a toast that the API call was made successfully.
+                // In production, matching openf1 driver_number/broadcast_name to our ALL_DRIVERS is required.
+                handleSave(`R${round} API synced (Mock mapping)`);
+                // Example mock assignment:
+                /*
+                handleFormChange(round, 'p1', 'Max Verstappen');
+                handleFormChange(round, 'p2', 'Lando Norris');
+                */
+            } else {
+                alert("Race session not found on OpenF1 API yet.");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Failed to fetch from OpenF1 API.");
+        } finally {
+            setIsFetchingApi(null);
+        }
     };
 
     return (
@@ -189,19 +235,74 @@ export default function AdminPage() {
                                                 className="overflow-hidden"
                                             >
                                                 <div className="px-3 pb-3 border-t border-[var(--color-carbon-700)] pt-3 space-y-3">
-                                                    {['P1 (Winner)', 'P2', 'P3', 'DNF Driver', 'Team Most Points', `Special: ${race.specialCategory.question}`].map((label) => (
-                                                        <div key={label}>
-                                                            <label className="data-readout text-[9px] block mb-1">{label.toUpperCase()}</label>
-                                                            <input
-                                                                type="text"
-                                                                placeholder={`Manually enter ${label.split(':')[0]}...`}
+
+                                                    <button
+                                                        onClick={() => handleFetchApi(race.round, race.gp.replace(/ GP.*/, ''), 2026)}
+                                                        disabled={isFetchingApi === race.round}
+                                                        className="btn-secondary w-full text-xs py-2 flex items-center justify-center gap-1.5 mb-2"
+                                                    >
+                                                        {isFetchingApi === race.round ? <Loader2 size={12} className="animate-spin" /> : <DownloadCloud size={12} />}
+                                                        Fetch from F1 API
+                                                    </button>
+
+                                                    {/* P1, P2, P3, DNF (Drivers) */}
+                                                    {['p1', 'p2', 'p3', 'dnf'].map((field) => (
+                                                        <div key={field}>
+                                                            <label className="data-readout text-[9px] block mb-1">
+                                                                {field === 'dnf' ? 'First DNF / DNF Driver' : field.toUpperCase()}
+                                                            </label>
+                                                            <select
+                                                                value={resultsForm[race.round]?.[field as keyof typeof resultsForm[number]] || ''}
+                                                                onChange={(e) => handleFormChange(race.round, field, e.target.value)}
                                                                 className="input-field text-sm"
-                                                            />
+                                                            >
+                                                                <option value="">Select driver...</option>
+                                                                {ALL_DRIVERS.map(d => (
+                                                                    <option key={d.name} value={d.name}>{d.name} ({d.team})</option>
+                                                                ))}
+                                                            </select>
                                                         </div>
                                                     ))}
+
+                                                    {/* Team Most Points */}
+                                                    <div>
+                                                        <label className="data-readout text-[9px] block mb-1">TEAM MOST POINTS</label>
+                                                        <select
+                                                            value={resultsForm[race.round]?.teamMostPts || ''}
+                                                            onChange={(e) => handleFormChange(race.round, 'teamMostPts', e.target.value)}
+                                                            className="input-field text-sm"
+                                                        >
+                                                            <option value="">Select team...</option>
+                                                            {TEAMS.map(t => (
+                                                                <option key={t.shortName} value={t.shortName}>{t.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
+                                                    {/* Special Category */}
+                                                    <div>
+                                                        <label className="data-readout text-[9px] block mb-1">SPECIAL: {race.specialCategory.question.toUpperCase()}</label>
+                                                        <select
+                                                            value={resultsForm[race.round]?.special || ''}
+                                                            onChange={(e) => handleFormChange(race.round, 'special', e.target.value)}
+                                                            className="input-field text-sm"
+                                                        >
+                                                            <option value="">Select answer...</option>
+                                                            {race.specialCategory.type === 'driver' && ALL_DRIVERS.map(d => (
+                                                                <option key={d.name} value={d.name}>{d.name}</option>
+                                                            ))}
+                                                            {race.specialCategory.type === 'team' && TEAMS.map(t => (
+                                                                <option key={t.shortName} value={t.shortName}>{t.shortName}</option>
+                                                            ))}
+                                                            {race.specialCategory.type === 'options' && race.specialCategory.options?.map(opt => (
+                                                                <option key={opt} value={opt}>{opt}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+
                                                     <button
                                                         onClick={() => handleSave(`R${race.round} results`)}
-                                                        className="btn-primary text-xs py-2 flex items-center gap-1.5"
+                                                        className="btn-primary text-xs py-2 flex items-center gap-1.5 w-full justify-center mt-2"
                                                     >
                                                         <Database size={12} />
                                                         Save Results & Score
