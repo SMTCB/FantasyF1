@@ -225,8 +225,8 @@ export default function RaceBetPage() {
                 </div>
             </header>
 
-            {/* Main Content Area */}
-            <div className={`px-5 pt-4 ${submitted ? 'opacity-80 pointer-events-none' : ''}`}>
+            {/* Choices Area */}
+            <div className={`px-5 pt-4 ${submitted ? 'opacity-70' : ''}`}>
                 {!submitted && !isRaceLocked && (
                     <div className="flex gap-2 mb-5">
                         {(['podium', 'extras'] as const).map((tab) => (
@@ -469,46 +469,50 @@ export default function RaceBetPage() {
                         </motion.div>
                     )}
                 </AnimatePresence>
+            </div>
 
-                {/* Submit / Status Area */}
-                <div className="pt-6 pb-4">
-                    {submitted ? (
-                        <div className="glass-card p-6 text-center glow-green">
-                            <CheckCircle size={32} className="text-[var(--color-success)] mx-auto mb-3" />
-                            <h3 className="font-bold text-lg mb-1">Bets Locked In!</h3>
-                            <p className="text-sm text-[var(--color-carbon-300)] mb-4">
-                                Your race predictions for {race.gp} are stored.
-                            </p>
-                            {!isRaceLocked && (
-                                <button
-                                    onClick={() => setSubmitted(false)}
-                                    className="text-[var(--color-f1-red)] text-xs font-bold hover:underline"
-                                >
-                                    EDIT MY BETS
-                                </button>
-                            )}
-                        </div>
-                    ) : (
-                        <>
+            {/* Submit / Status Area */}
+            <div className="pt-6 pb-4">
+                {submitted ? (
+                    <div className="glass-card p-6 text-center glow-green">
+                        <CheckCircle size={32} className="text-[var(--color-success)] mx-auto mb-3" />
+                        <h3 className="font-bold text-lg mb-1">Bets Locked In!</h3>
+                        <p className="text-sm text-[var(--color-carbon-300)] mb-4">
+                            Your race predictions for {race.gp} are stored.
+                        </p>
+                        {!isRaceLocked && (
                             <button
-                                onClick={handleSubmit}
-                                disabled={!allBetsFilled || isRaceLocked}
-                                className={`btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 ${isRaceLocked ? 'opacity-50 grayscale' : ''}`}
+                                onClick={() => {
+                                    setSubmitted(false);
+                                    // Optional: automatically switch to podium if extras were open
+                                    setActiveSection('podium');
+                                }}
+                                className="btn-secondary w-full py-2 text-xs font-bold mt-2"
                             >
-                                {isRaceLocked ? <Lock size={14} /> : <Zap size={14} />}
-                                {isRaceLocked ? 'BETS LOCKED' : 'LOCK IN RACE BETS'}
+                                RE-UNLOCK BETS FOR EDITING
                             </button>
-                            {!allBetsFilled && (
-                                <p className="text-center text-[10px] text-[var(--color-carbon-400)] mt-2 font-mono">
-                                    FILL ALL CATEGORIES TO SUBMIT
-                                </p>
-                            )}
-                        </>
-                    )}
-                </div>
+                        )}
+                    </div>
+                ) : (
+                    <>
+                        <button
+                            onClick={handleSubmit}
+                            disabled={!allBetsFilled || isRaceLocked}
+                            className={`btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 ${isRaceLocked ? 'opacity-50 grayscale' : ''}`}
+                        >
+                            {isRaceLocked ? <Lock size={14} /> : <Zap size={14} />}
+                            {isRaceLocked ? 'BETS LOCKED' : 'LOCK IN RACE BETS'}
+                        </button>
+                        {!allBetsFilled && (
+                            <p className="text-center text-[10px] text-[var(--color-carbon-400)] mt-2 font-mono">
+                                FILL ALL CATEGORIES TO SUBMIT
+                            </p>
+                        )}
+                    </>
+                )}
             </div>
 
             <BottomNav />
-        </main>
+        </main >
     );
 }
