@@ -20,13 +20,12 @@ import {
 import BottomNav from '@/components/BottomNav';
 import { CALENDAR, ALL_DRIVERS, TEAMS, YEAR_BET_SCORING } from '@/lib/f1-data';
 
-type AdminTab = 'special' | 'results' | 'scores' | 'yearend';
+type AdminTab = 'results' | 'scores' | 'yearend';
 
 export default function AdminPage() {
     const [isAuthed, setIsAuthed] = useState(false);
     const [pin, setPin] = useState('');
-    const [activeTab, setActiveTab] = useState<AdminTab>('special');
-    const [specialCategories, setSpecialCategories] = useState<Record<number, string>>({});
+    const [activeTab, setActiveTab] = useState<AdminTab>('results');
     const [expandedRound, setExpandedRound] = useState<number | null>(null);
     const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
@@ -75,9 +74,8 @@ export default function AdminPage() {
     }
 
     const TABS: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
-        { id: 'special', label: 'Special Cat.', icon: <Star size={14} /> },
-        { id: 'results', label: 'Results', icon: <Trophy size={14} /> },
-        { id: 'scores', label: 'Scores', icon: <Edit3 size={14} /> },
+        { id: 'results', label: 'Race Results', icon: <Trophy size={14} /> },
+        { id: 'scores', label: 'Score Overrides', icon: <Edit3 size={14} /> },
         { id: 'yearend', label: 'Year End', icon: <Calendar size={14} /> },
     ];
 
@@ -155,66 +153,7 @@ export default function AdminPage() {
 
             <div className="px-5">
                 <AnimatePresence mode="wait">
-                    {/* ── Special Categories Tab ── */}
-                    {activeTab === 'special' && (
-                        <motion.div
-                            key="special"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="space-y-3"
-                        >
-                            <p className="text-xs text-[var(--color-carbon-400)] mb-4">
-                                Define the special category question for each race. Users will see this when placing their race bets.
-                            </p>
-                            {CALENDAR.map((race) => (
-                                <div key={race.round} className="glass-card">
-                                    <button
-                                        onClick={() => setExpandedRound(expandedRound === race.round ? null : race.round)}
-                                        className="w-full flex items-center gap-3 p-3 text-left"
-                                    >
-                                        <span className="data-readout text-[10px] w-8">R{String(race.round).padStart(2, '0')}</span>
-                                        <span className="font-medium text-sm flex-1 truncate">{race.gp}</span>
-                                        {specialCategories[race.round] && (
-                                            <CheckCircle size={14} className="text-[var(--color-success)]" />
-                                        )}
-                                        <ChevronDown
-                                            size={14}
-                                            className={`text-[var(--color-carbon-400)] transition-transform ${expandedRound === race.round ? 'rotate-180' : ''}`}
-                                        />
-                                    </button>
-                                    <AnimatePresence>
-                                        {expandedRound === race.round && (
-                                            <motion.div
-                                                initial={{ height: 0, opacity: 0 }}
-                                                animate={{ height: 'auto', opacity: 1 }}
-                                                exit={{ height: 0, opacity: 0 }}
-                                                className="overflow-hidden"
-                                            >
-                                                <div className="px-3 pb-3 border-t border-[var(--color-carbon-700)] pt-3">
-                                                    <label className="data-readout text-[9px] block mb-2">SPECIAL CATEGORY QUESTION</label>
-                                                    <input
-                                                        type="text"
-                                                        value={specialCategories[race.round] || ''}
-                                                        onChange={(e) => setSpecialCategories({ ...specialCategories, [race.round]: e.target.value })}
-                                                        placeholder="e.g., Which driver gets the fastest lap?"
-                                                        className="input-field text-sm mb-3"
-                                                    />
-                                                    <button
-                                                        onClick={() => handleSave(`R${race.round} special category`)}
-                                                        className="btn-primary text-xs py-2 flex items-center gap-1.5"
-                                                    >
-                                                        <Save size={12} />
-                                                        Save
-                                                    </button>
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
-                            ))}
-                        </motion.div>
-                    )}
+                    {/* ── Removed Special Categories Setup Tab since they are now pre-defined in f1-data.ts ── */}
 
                     {/* ── Results Tab ── */}
                     {activeTab === 'results' && (
@@ -250,12 +189,12 @@ export default function AdminPage() {
                                                 className="overflow-hidden"
                                             >
                                                 <div className="px-3 pb-3 border-t border-[var(--color-carbon-700)] pt-3 space-y-3">
-                                                    {['P1 (Winner)', 'P2', 'P3', 'DNF Driver', 'Team Most Points', 'Special Category Answer'].map((label) => (
+                                                    {['P1 (Winner)', 'P2', 'P3', 'DNF Driver', 'Team Most Points', `Special: ${race.specialCategory.question}`].map((label) => (
                                                         <div key={label}>
                                                             <label className="data-readout text-[9px] block mb-1">{label.toUpperCase()}</label>
                                                             <input
                                                                 type="text"
-                                                                placeholder={`Enter ${label}...`}
+                                                                placeholder={`Manually enter ${label.split(':')[0]}...`}
                                                                 className="input-field text-sm"
                                                             />
                                                         </div>

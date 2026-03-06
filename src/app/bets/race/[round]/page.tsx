@@ -98,7 +98,7 @@ export default function RaceBetPage() {
     );
 
     const selectedPodium = [p1, p2, p3].filter(Boolean);
-    const allBetsFilled = p1 && p2 && p3 && dnf && teamMostPts;
+    const allBetsFilled = p1 && p2 && p3 && dnf && teamMostPts && specialBet;
 
     const handleSubmit = () => {
         if (!allBetsFilled) return;
@@ -318,19 +318,82 @@ export default function RaceBetPage() {
                                     </div>
                                 </div>
 
-                                {/* Special Category placeholder */}
-                                <div className="glass-card p-4">
-                                    <h3 className="font-semibold text-sm mb-1 flex items-center gap-2">
-                                        <Star size={14} className="text-[var(--color-warning)]" />
-                                        Special Category
+                                {/* Special Category */}
+                                <div>
+                                    <h3 className="font-semibold text-sm mb-2 flex items-start gap-2">
+                                        <Star size={14} className="text-[var(--color-warning)] mt-1 flex-shrink-0" />
+                                        <div>
+                                            {race.specialCategory.question}
+                                            <div className="data-readout text-[9px] mt-1 text-[var(--color-carbon-400)]">SPECIAL CATEGORY</div>
+                                        </div>
                                         <span className="score-pill text-[9px] ml-auto">{RACE_BET_SCORING.SPECIAL_CATEGORY}pts</span>
                                     </h3>
-                                    <p className="text-xs text-[var(--color-carbon-400)] mb-3">
-                                        Set by admin before each race. Check back later!
-                                    </p>
-                                    <div className="telemetry-border p-3 text-center">
-                                        <span className="data-readout text-[10px]">PENDING ADMIN INPUT</span>
-                                    </div>
+
+                                    {race.specialCategory.type === 'driver' && (
+                                        <div className="grid grid-cols-2 gap-2 max-h-[250px] overflow-y-auto">
+                                            {ALL_DRIVERS.map((driver) => (
+                                                <DriverCard
+                                                    key={driver.name}
+                                                    driver={driver}
+                                                    isSelected={specialBet === driver.name}
+                                                    onSelect={() => setSpecialBet(specialBet === driver.name ? null : driver.name)}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {race.specialCategory.type === 'team' && (
+                                        <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                                            {TEAMS.map((team) => (
+                                                <motion.button
+                                                    key={team.shortName}
+                                                    whileTap={{ scale: 0.97 }}
+                                                    onClick={() => setSpecialBet(specialBet === team.shortName ? null : team.shortName)}
+                                                    className={`
+                                                        flex items-center gap-3 p-3 rounded-lg border transition-all text-left w-full
+                                                        ${specialBet === team.shortName
+                                                            ? 'border-[var(--color-f1-red)]/60 bg-[var(--color-f1-red)]/10'
+                                                            : 'border-[var(--color-carbon-700)] bg-[var(--color-carbon-800)]/40 hover:border-[var(--color-carbon-500)]'
+                                                        }
+                                                    `}
+                                                >
+                                                    <div className="w-3 h-8 rounded-full flex-shrink-0" style={{ backgroundColor: team.color }} />
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="font-semibold text-sm">{team.shortName}</div>
+                                                    </div>
+                                                    {specialBet === team.shortName && (
+                                                        <CheckCircle size={16} className="text-[var(--color-f1-red)]" />
+                                                    )}
+                                                </motion.button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {race.specialCategory.type === 'options' && race.specialCategory.options && (
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {race.specialCategory.options.map((opt) => (
+                                                <motion.button
+                                                    key={opt}
+                                                    whileTap={{ scale: 0.97 }}
+                                                    onClick={() => setSpecialBet(specialBet === opt ? null : opt)}
+                                                    className={`
+                                                        p-4 rounded-lg border transition-all font-semibold text-center
+                                                        ${specialBet === opt
+                                                            ? 'border-[var(--color-f1-red)]/60 bg-[var(--color-f1-red)]/10 text-white'
+                                                            : 'border-[var(--color-carbon-700)] bg-[var(--color-carbon-800)]/40 text-[var(--color-carbon-300)] hover:border-[var(--color-carbon-500)]'
+                                                        }
+                                                    `}
+                                                >
+                                                    {opt}
+                                                    {specialBet === opt && (
+                                                        <div className="flex justify-center mt-2">
+                                                            <CheckCircle size={16} className="text-[var(--color-f1-red)]" />
+                                                        </div>
+                                                    )}
+                                                </motion.button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </motion.div>
                         )}
