@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import BottomNav from '@/components/BottomNav';
 import NextRaceHero from '@/components/NextRaceHero';
 import Leaderboard from '@/components/Leaderboard';
@@ -7,16 +8,45 @@ import RaceCalendarStrip from '@/components/RaceCalendarStrip';
 import { motion } from 'framer-motion';
 import { Gauge } from 'lucide-react';
 
-// Mock leaderboard data — will be replaced with Supabase queries
-const MOCK_ENTRIES = [
-    { userId: '1', displayName: 'Speed Demon', totalPoints: 0, avatarEmoji: '🏎️' },
-    { userId: '2', displayName: 'Pit Stop Pro', totalPoints: 0, avatarEmoji: '🔧' },
-    { userId: '3', displayName: 'DRS Master', totalPoints: 0, avatarEmoji: '💨' },
-    { userId: '4', displayName: 'Grid Walker', totalPoints: 0, avatarEmoji: '🚦' },
-    { userId: '5', displayName: 'Tyre Whisperer', totalPoints: 0, avatarEmoji: '🛞' },
-];
+import { createClient } from '@/lib/supabase/client';
+import { type LeaderboardEntry } from '@/components/Leaderboard';
+
+// No more mock entries — fetching from Supabase leaderboard view!
 
 export default function DashboardPage() {
+    const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+    const [loading, setLoading] = useState(true);
+    const supabase = createClient();
+
+    useEffect(() => {
+        const fetchLeaderboard = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('leaderboard')
+                    .select('*')
+                    .order('total_points', { ascending: false });
+
+                if (error) throw error;
+
+                // Map DB view fields to matching prop names
+                const mappedEntries: LeaderboardEntry[] = (data || []).map(row => ({
+                    userId: row.user_id,
+                    displayName: row.display_name,
+                    totalPoints: row.total_points,
+                    avatarEmoji: row.avatar_emoji || '🏎️'
+                }));
+
+                setEntries(mappedEntries);
+            } catch (err) {
+                console.error('Leaderboard fetch error:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchLeaderboard();
+    }, [supabase]);
+
     return (
         <main className="min-h-screen pb-24">
             {/* Header */}
@@ -87,7 +117,14 @@ export default function DashboardPage() {
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.4, delay: 0.3 }}
                 >
-                    <Leaderboard entries={MOCK_ENTRIES} />
+                    {loading ? (
+                        <div className="telemetry-border p-12 flex flex-col items-center justify-center">
+                            <div className="w-6 h-6 border-2 border-[var(--color-f1-red)]/30 border-t-[var(--color-f1-red)] rounded-full animate-spin mb-3" />
+                            <span className="data-readout text-[10px] text-[var(--color-carbon-400)] uppercase">Synchronizing Standings...</span>
+                        </div>
+                    ) : (
+                        <Leaderboard entries={entries} />
+                    )}
                 </motion.div>
             </div>
 
