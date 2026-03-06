@@ -18,7 +18,7 @@ test.describe('Authentication Flow', () => {
         await page.goto('/login');
 
         // Fill in bogus details
-        await page.fill('input[type="email"]', 'fake.user@example.com');
+        await page.fill('input[placeholder="Username"]', 'fakeuser');
         await page.fill('input[type="password"]', 'WrongPassword123');
 
         // Submit

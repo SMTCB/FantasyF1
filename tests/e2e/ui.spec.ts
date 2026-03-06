@@ -10,8 +10,8 @@ test.describe('UI Consistency & Navigation', () => {
         expect(numCards).toBeGreaterThanOrEqual(1);
 
         // Verify inputs have correct styles
-        const emailInput = page.locator('input[type="email"]');
-        await expect(emailInput).toHaveClass(/bg-white\/5/);
-        await expect(emailInput).toHaveClass(/border-white\/10/);
+        const usernameInput = page.locator('input[placeholder="Enter username"]');
+        await expect(usernameInput).toBeVisible();
+        await expect(usernameInput).toHaveClass(/input-field/);
     });
 });

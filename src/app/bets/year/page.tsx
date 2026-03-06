@@ -208,9 +208,36 @@ export default function YearBetsPage() {
     const allFilled = filledCategories === totalCategories;
 
     const handleSubmit = async () => {
-        if (!allFilled) return;
-        // TODO: Submit to Supabase
-        setSubmitted(true);
+        if (!allFilled || isLocked) return;
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { error } = await supabase
+            .from('bets_year')
+            .upsert({
+                user_id: user.id,
+                driver_champion: bets['driver_champion'],
+                driver_p2: bets['driver_p2'],
+                driver_p3: bets['driver_p3'],
+                constructor_champion: bets['constructor_champion'],
+                last_constructor: bets['last_constructor'],
+                fewest_finishers_race: bets['fewest_finishers'],
+                most_dnfs_driver: bets['most_dnfs'],
+                first_driver_replaced: bets['first_replaced'],
+                most_poles: bets['most_poles'],
+                most_podiums_no_win: bets['most_podiums_no_win'],
+                updated_at: new Date().toISOString()
+            }, {
+                onConflict: 'user_id'
+            });
+
+        if (error) {
+            console.error(error);
+            alert("Failed to save year bets. Please try again.");
+        } else {
+            setSubmitted(true);
+        }
     };
 
     return (

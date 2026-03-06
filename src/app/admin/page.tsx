@@ -25,13 +25,16 @@ import BottomNav from '@/components/BottomNav';
 import { CALENDAR, ALL_DRIVERS, TEAMS, YEAR_BET_SCORING } from '@/lib/f1-data';
 import { fetchRaceSession, fetchRaceResults } from '@/lib/openf1';
 import { createClient } from '@/lib/supabase/client';
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
+import { scoreRaceBet, scoreYearBet, type RaceBet, type RaceResult, type YearBet, type YearResult } from '@/lib/scoring';
 
 type AdminTab = 'results' | 'scores' | 'yearend';
 
 export default function AdminPage() {
     const [isAuthed, setIsAuthed] = useState(false);
     const [pin, setPin] = useState('');
+    const [currentUser, setCurrentUser] = useState<string | null>(null);
+    const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
     const [activeTab, setActiveTab] = useState<AdminTab>('results');
     const [expandedRound, setExpandedRound] = useState<number | null>(null);
     const [saveStatus, setSaveStatus] = useState<string | null>(null);
@@ -44,11 +47,25 @@ export default function AdminPage() {
     const [isYearLocked, setIsYearLocked] = useState(false);
     const [isLoadingLock, setIsLoadingLock] = useState(false);
     const [manualUnlocks, setManualUnlocks] = useState<Record<number, boolean>>({});
+
+    // Year results form state
+    const [yearResultsForm, setYearResultsForm] = useState<Partial<YearResult>>({});
+
     const supabase = createClient();
 
     // Fetch year lock status and manual race unlocks
     useEffect(() => {
         const fetchData = async () => {
+            // Get current user
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const username = user.email?.split('@')[0].toLowerCase();
+                setCurrentUser(username || null);
+                setIsAuthorized(username === 'segismundob');
+            } else {
+                setIsAuthorized(false);
+            }
+
             // Year lock
             const { data: yearData } = await supabase
                 .from('year_results')
@@ -80,6 +97,27 @@ export default function AdminPage() {
         }
     };
 
+    if (isAuthorized === false) {
+        return (
+            <main className="min-h-screen flex items-center justify-center pb-24">
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="glass-card p-8 mx-5 w-full max-w-sm text-center border-[var(--color-danger)]/30"
+                >
+                    <div className="w-16 h-16 rounded-2xl mx-auto mb-5 flex items-center justify-center bg-[var(--color-danger)]/20">
+                        <Shield size={28} className="text-[var(--color-danger)]" />
+                    </div>
+                    <h2 className="text-xl font-bold mb-2">Access Denied</h2>
+                    <p className="text-sm text-[var(--color-carbon-400)]">
+                        Only the lead administrator (SegismundoB) can access this telemetry panel.
+                    </p>
+                </motion.div>
+                <BottomNav />
+            </main>
+        );
+    }
+
     if (!isAuthed) {
         return (
             <main className="min-h-screen flex items-center justify-center pb-24">
@@ -98,7 +136,7 @@ export default function AdminPage() {
                         Admin Access
                     </h2>
                     <p className="text-sm text-[var(--color-carbon-400)] mb-6">
-                        Enter your admin PIN to continue
+                        Welcome, <strong>SegismundoB</strong>. Enter your PIN to continue.
                     </p>
                     <input
                         type="password"
@@ -136,6 +174,183 @@ export default function AdminPage() {
                 [field]: value
             }
         }));
+    };
+
+    const handleYearFormChange = (field: keyof YearResult, value: string) => {
+        setYearResultsForm(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleSaveRaceResults = async (round: number) => {
+        const form = resultsForm[round];
+        if (!form || !form.p1 || !form.p2 || !form.p3) {
+            alert("Please fill at least the podium (P1, P2, P3)");
+            return;
+        }
+
+        setSaveStatus(`R${round} Processing...`);
+
+        try {
+            // 1. Save race results to 'races' table
+            const { error: raceError } = await supabase
+                .from('races')
+                .update({
+                    result_p1: form.p1,
+                    result_p2: form.p2,
+                    result_p3: form.p3,
+                    result_dnf_drivers: form.dnf ? [form.dnf] : [],
+                    result_team_most_points: form.teamMostPts,
+                    special_category_answer: form.special,
+                    is_scored: true
+                })
+                .eq('round', round);
+
+            if (raceError) throw raceError;
+
+            // 2. Fetch ALL bets for this round
+            const { data: bets, error: betsError } = await supabase
+                .from('bets_race')
+                .select('*')
+                .eq('round', round);
+
+            if (betsError) throw betsError;
+
+            // 3. Prepare result for scoring engine
+            const raceResult: RaceResult = {
+                p1: form.p1,
+                p2: form.p2,
+                p3: form.p3,
+                dnfDrivers: form.dnf ? [form.dnf] : [],
+                teamMostPoints: form.teamMostPts || '',
+                specialCategoryAnswer: form.special || null
+            };
+
+            // 4. Calculate and upsert scores for each user
+            const scorePromises = (bets || []).map(async (bet) => {
+                const raceBet: RaceBet = {
+                    p1: bet.p1,
+                    p2: bet.p2,
+                    p3: bet.p3,
+                    dnf: bet.dnf_driver,
+                    teamMostPoints: bet.team_most_points,
+                    specialCategory: bet.special_category_answer
+                };
+
+                const score = scoreRaceBet(raceBet, raceResult);
+
+                return supabase
+                    .from('scores')
+                    .upsert({
+                        user_id: bet.user_id,
+                        round: round,
+                        score_type: 'race',
+                        podium_p1_pts: score.podiumP1,
+                        podium_p2_pts: score.podiumP2,
+                        podium_p3_pts: score.podiumP3,
+                        podium_bonus_pts: score.podiumBonus,
+                        wrong_spot_pts: score.wrongSpotPoints,
+                        dnf_pts: score.dnfPoints,
+                        team_pts: score.teamPoints,
+                        special_pts: score.specialPoints,
+                        all_correct_bonus: score.allCorrectBonus,
+                        total_points: score.total,
+                        scored_at: new Date().toISOString()
+                    }, {
+                        onConflict: 'user_id, round, score_type'
+                    });
+            });
+
+            await Promise.all(scorePromises);
+            handleSave(`Race ${round} results & scores`);
+        } catch (e: any) {
+            console.error(e);
+            alert(`Error processing scores: ${e.message}`);
+        }
+    };
+
+    const handleCalculateYearScores = async () => {
+        // Basic validation
+        const requiredFields: (keyof YearResult)[] = [
+            'driverChampion', 'driverP2', 'driverP3', 'constructorChampion',
+            'lastConstructor', 'fewestFinishersRace', 'mostDnfsDriver',
+            'firstDriverReplaced', 'mostPoles', 'mostPodiumsNoWin'
+        ];
+
+        for (const field of requiredFields) {
+            if (!yearResultsForm[field]) {
+                alert(`Missing field: ${field}`);
+                return;
+            }
+        }
+
+        setSaveStatus("Year-end Scoring...");
+
+        try {
+            // 1. Save year results
+            const { error: yearError } = await supabase
+                .from('year_results')
+                .upsert({
+                    season: 2026,
+                    driver_champion: yearResultsForm.driverChampion,
+                    driver_p2: yearResultsForm.driverP2,
+                    driver_p3: yearResultsForm.driverP3,
+                    constructor_champion: yearResultsForm.constructorChampion,
+                    last_constructor: yearResultsForm.lastConstructor,
+                    fewest_finishers_race: yearResultsForm.fewestFinishersRace,
+                    most_dnfs_driver: yearResultsForm.mostDnfsDriver,
+                    first_driver_replaced: yearResultsForm.firstDriverReplaced,
+                    most_poles: yearResultsForm.mostPoles,
+                    most_podiums_no_win: yearResultsForm.mostPodiumsNoWin,
+                    is_final: true
+                }, { onConflict: 'season' });
+
+            if (yearError) throw yearError;
+
+            // 2. Fetch all year bets
+            const { data: bets, error: betsError } = await supabase
+                .from('bets_year')
+                .select('*');
+
+            if (betsError) throw betsError;
+
+            const yearResult = yearResultsForm as YearResult;
+
+            // 3. Score each bet
+            const scorePromises = (bets || []).map(async (bet) => {
+                const yearBet: YearBet = {
+                    driverChampion: bet.driver_champion,
+                    driverP2: bet.driver_p2,
+                    driverP3: bet.driver_p3,
+                    constructorChampion: bet.constructor_champion,
+                    last_constructor: bet.last_constructor,
+                    fewest_finishers_race: bet.fewest_finishers_race,
+                    most_dnfs_driver: bet.most_dnfs_driver,
+                    first_driver_replaced: bet.first_driver_replaced,
+                    most_poles: bet.most_poles,
+                    most_podiums_no_win: bet.most_podiums_no_win
+                };
+
+                const score = scoreYearBet(yearBet, yearResult);
+
+                return supabase
+                    .from('scores')
+                    .upsert({
+                        user_id: bet.user_id,
+                        round: null, // Year scores have null round usually or handled by type
+                        score_type: 'year',
+                        year_breakdown: score.breakdown,
+                        total_points: score.total,
+                        scored_at: new Date().toISOString()
+                    }, {
+                        onConflict: 'user_id, round, score_type'
+                    });
+            });
+
+            await Promise.all(scorePromises);
+            handleSave("Year-end scores");
+        } catch (e: any) {
+            console.error(e);
+            alert(`Error scoring year: ${e.message}`);
+        }
     };
 
     const handleFetchApi = async (round: number, country: string, year: number) => {
@@ -385,7 +600,7 @@ export default function AdminPage() {
                                                     </div>
 
                                                     <button
-                                                        onClick={() => handleSave(`R${race.round} results`)}
+                                                        onClick={() => handleSaveRaceResults(race.round)}
                                                         className="btn-primary text-xs py-2 flex items-center gap-1.5 w-full justify-center mt-2"
                                                     >
                                                         <Database size={12} />
@@ -471,7 +686,11 @@ export default function AdminPage() {
                                 {['Driver Champion (P1)', 'Driver Runner-up (P2)', 'Driver P3'].map((label) => (
                                     <div key={label}>
                                         <label className="data-readout text-[9px] block mb-1">{label.toUpperCase()}</label>
-                                        <select className="input-field text-sm">
+                                        <select
+                                            value={yearResultsForm[label === 'Driver Champion (P1)' ? 'driverChampion' : label === 'Driver Runner-up (P2)' ? 'driverP2' : 'driverP3'] || ''}
+                                            onChange={(e) => handleYearFormChange(label === 'Driver Champion (P1)' ? 'driverChampion' : label === 'Driver Runner-up (P2)' ? 'driverP2' : 'driverP3', e.target.value)}
+                                            className="input-field text-sm"
+                                        >
                                             <option value="">Select driver...</option>
                                             {ALL_DRIVERS.map(d => (
                                                 <option key={d.name} value={d.name}>{d.name} ({d.team})</option>
@@ -489,7 +708,11 @@ export default function AdminPage() {
                                 {['Constructors Champion', 'Last Place Constructor'].map((label) => (
                                     <div key={label}>
                                         <label className="data-readout text-[9px] block mb-1">{label.toUpperCase()}</label>
-                                        <select className="input-field text-sm">
+                                        <select
+                                            value={yearResultsForm[label === 'Constructors Champion' ? 'constructorChampion' : 'lastConstructor'] || ''}
+                                            onChange={(e) => handleYearFormChange(label === 'Constructors Champion' ? 'constructorChampion' : 'lastConstructor', e.target.value)}
+                                            className="input-field text-sm"
+                                        >
                                             <option value="">Select team...</option>
                                             {TEAMS.map(t => (
                                                 <option key={t.shortName} value={t.shortName}>{t.name}</option>
@@ -505,15 +728,19 @@ export default function AdminPage() {
                                     Special Year Categories
                                 </h3>
                                 {[
-                                    { label: 'Race with Fewest Finishers', type: 'race' },
-                                    { label: 'Driver with Most DNFs', type: 'driver' },
-                                    { label: 'First Driver Replaced', type: 'driver' },
-                                    { label: 'Most Pole Positions', type: 'driver' },
-                                    { label: 'Most Podiums Without a Win', type: 'driver' },
+                                    { label: 'Race with Fewest Finishers', type: 'race', id: 'fewestFinishersRace' },
+                                    { label: 'Driver with Most DNFs', type: 'driver', id: 'mostDnfsDriver' },
+                                    { label: 'First Driver Replaced', type: 'driver', id: 'firstDriverReplaced' },
+                                    { label: 'Most Pole Positions', type: 'driver', id: 'mostPoles' },
+                                    { label: 'Most Podiums Without a Win', type: 'driver', id: 'mostPodiumsNoWin' },
                                 ].map((cat) => (
-                                    <div key={cat.label}>
+                                    <div key={cat.id}>
                                         <label className="data-readout text-[9px] block mb-1">{cat.label.toUpperCase()}</label>
-                                        <select className="input-field text-sm">
+                                        <select
+                                            value={yearResultsForm[cat.id as keyof YearResult] || ''}
+                                            onChange={(e) => handleYearFormChange(cat.id as keyof YearResult, e.target.value)}
+                                            className="input-field text-sm"
+                                        >
                                             <option value="">Select...</option>
                                             {cat.type === 'driver' && ALL_DRIVERS.map(d => (
                                                 <option key={d.name} value={d.name}>{d.name}</option>
@@ -555,7 +782,10 @@ export default function AdminPage() {
                                 </div>
                             </div>
 
-                            <button className="btn-primary w-full py-3 text-sm flex items-center justify-center gap-2">
+                            <button
+                                onClick={handleCalculateYearScores}
+                                className="btn-primary w-full py-3 text-sm flex items-center justify-center gap-2"
+                            >
                                 <Zap size={14} />
                                 CALCULATE & SCORE YEAR BETS
                             </button>
