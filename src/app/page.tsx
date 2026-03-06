@@ -6,7 +6,8 @@ import NextRaceHero from '@/components/NextRaceHero';
 import Leaderboard from '@/components/Leaderboard';
 import RaceCalendarStrip from '@/components/RaceCalendarStrip';
 import { motion } from 'framer-motion';
-import { Gauge } from 'lucide-react';
+import { Gauge, LogOut } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 import { createClient } from '@/lib/supabase/client';
 import { type LeaderboardEntry } from '@/components/Leaderboard';
@@ -15,10 +16,24 @@ import { type LeaderboardEntry } from '@/components/Leaderboard';
 
 export default function DashboardPage() {
     const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+    const [userProfile, setUserProfile] = useState<{ username: string } | null>(null);
     const [loading, setLoading] = useState(true);
+    const router = useRouter();
     const supabase = createClient();
 
     useEffect(() => {
+        const checkAuth = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                router.push('/login');
+                return;
+            }
+
+            // Extract username from email alias
+            const displayUsername = user.email?.split('@')[0] || 'Racer';
+            setUserProfile({ username: displayUsername });
+        };
+
         const fetchLeaderboard = async () => {
             try {
                 const { data, error } = await supabase
@@ -44,8 +59,14 @@ export default function DashboardPage() {
             }
         };
 
+        checkAuth();
         fetchLeaderboard();
-    }, [supabase]);
+    }, [supabase, router]);
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        router.push('/login');
+    };
 
     return (
         <main className="min-h-screen pb-24">
@@ -83,12 +104,23 @@ export default function DashboardPage() {
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <div className="telemetry-border px-3 py-1.5">
-                                <span className="data-readout text-[10px]">
-                                    SYS ONLINE
+                        <div className="flex items-center gap-3">
+                            {userProfile && (
+                                <div className="flex flex-col items-end">
+                                    <span className="data-readout text-[10px] text-[var(--color-carbon-400)]">ACTIVE USER</span>
+                                    <span className="text-xs font-bold text-[var(--color-f1-red)] uppercase tracking-wider">
+                                        {userProfile.username}
+                                    </span>
+                                </div>
+                            )}
+                            <button
+                                onClick={handleLogout}
+                                className="telemetry-border px-3 py-1.5 hover:bg-[var(--color-f1-red)]/10 transition-colors"
+                            >
+                                <span className="data-readout text-[8px] text-[var(--color-carbon-300)]">
+                                    SIGNOUT
                                 </span>
-                            </div>
+                            </button>
                         </div>
                     </div>
                 </div>
