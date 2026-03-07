@@ -315,7 +315,7 @@ export default function YearBetsPage() {
             </div>
 
             {/* Bet Categories */}
-            <div className="px-5 space-y-3">
+            <div className={`px-5 space-y-3 ${submitted ? 'opacity-70 pointer-events-none' : ''}`}>
                 <AnimatePresence>
                     {YEAR_BET_CATEGORIES.map((cat, idx) => {
                         const isOpen = openCategory === cat.id;
@@ -426,9 +426,19 @@ export default function YearBetsPage() {
                         <div className="glass-card p-6 text-center glow-green">
                             <CheckCircle size={32} className="text-[var(--color-success)] mx-auto mb-3" />
                             <h3 className="font-bold text-lg mb-1">Bets Locked In!</h3>
-                            <p className="text-sm text-[var(--color-carbon-300)]">
+                            <p className="text-sm text-[var(--color-carbon-300)] mb-4">
                                 Your year predictions have been submitted. Good luck!
                             </p>
+                            {!isLocked && (
+                                <button
+                                    onClick={() => {
+                                        setSubmitted(false);
+                                    }}
+                                    className="btn-secondary w-full py-2 text-xs font-bold mt-2"
+                                >
+                                    RE-UNLOCK BETS FOR EDITING
+                                </button>
+                            )}
                         </div>
                     ) : isLocked ? (
                         <div className="glass-card p-6 text-center border-[var(--color-danger)]/30">
