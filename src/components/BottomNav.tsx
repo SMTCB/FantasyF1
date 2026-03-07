@@ -9,12 +9,14 @@ import {
     Flag,
     Settings,
     ChevronRight,
+    ClipboardList,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/bets/year', label: 'Year Bets', icon: Trophy },
     { href: '/bets/race', label: 'Race Bets', icon: Flag },
+    { href: '/bets/report', label: 'Report', icon: ClipboardList },
     { href: '/admin', label: 'Admin', icon: Settings },
 ];
 
