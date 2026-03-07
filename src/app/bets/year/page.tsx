@@ -315,105 +315,107 @@ export default function YearBetsPage() {
             </div>
 
             {/* Bet Categories */}
-            <div className={`px-5 space-y-3 ${submitted ? 'opacity-70 pointer-events-none' : ''}`}>
-                <AnimatePresence>
-                    {YEAR_BET_CATEGORIES.map((cat, idx) => {
-                        const isOpen = openCategory === cat.id;
-                        const selection = bets[cat.id];
+            <div className="px-5 space-y-3">
+                <div className={`space-y-3 ${submitted ? 'opacity-70 pointer-events-none' : ''}`}>
+                    <AnimatePresence>
+                        {YEAR_BET_CATEGORIES.map((cat, idx) => {
+                            const isOpen = openCategory === cat.id;
+                            const selection = bets[cat.id];
 
-                        return (
-                            <motion.div
-                                key={cat.id}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: idx * 0.04 }}
-                                className="glass-card overflow-hidden"
-                            >
-                                {/* Category Header */}
-                                <button
-                                    onClick={() => {
-                                        if (isLocked) return;
-                                        setOpenCategory(isOpen ? null : cat.id);
-                                    }}
-                                    className={`w-full flex items-center gap-3 p-4 text-left ${isLocked ? 'opacity-70 cursor-not-allowed' : ''}`}
+                            return (
+                                <motion.div
+                                    key={cat.id}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: idx * 0.04 }}
+                                    className="glass-card overflow-hidden"
                                 >
-                                    <div
-                                        className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                                        style={{
-                                            background: selection
-                                                ? 'rgba(0, 230, 118, 0.15)'
-                                                : 'rgba(225, 6, 0, 0.1)',
-                                            color: selection
-                                                ? 'var(--color-success)'
-                                                : 'var(--color-f1-red)',
+                                    {/* Category Header */}
+                                    <button
+                                        onClick={() => {
+                                            if (isLocked) return;
+                                            setOpenCategory(isOpen ? null : cat.id);
                                         }}
+                                        className={`w-full flex items-center gap-3 p-4 text-left ${isLocked ? 'opacity-70 cursor-not-allowed' : ''}`}
                                     >
-                                        {selection ? <CheckCircle size={18} /> : cat.icon}
-                                    </div>
-
-                                    <div className="flex-1 min-w-0">
-                                        <div className="font-semibold text-sm">{cat.label}</div>
-                                        <div className="text-xs text-[var(--color-carbon-400)] truncate">
-                                            {selection || cat.description}
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                        <span className="score-pill text-[10px]">{cat.points}pts</span>
-                                        <ChevronDown
-                                            size={16}
-                                            className={`text-[var(--color-carbon-400)] transition-transform ${isOpen ? 'rotate-180' : ''
-                                                }`}
-                                        />
-                                    </div>
-                                </button>
-
-                                {/* Expanded Selector */}
-                                <AnimatePresence>
-                                    {isOpen && (
-                                        <motion.div
-                                            initial={{ height: 0, opacity: 0 }}
-                                            animate={{ height: 'auto', opacity: 1 }}
-                                            exit={{ height: 0, opacity: 0 }}
-                                            transition={{ duration: 0.2 }}
-                                            className="overflow-hidden"
+                                        <div
+                                            className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                                            style={{
+                                                background: selection
+                                                    ? 'rgba(0, 230, 118, 0.15)'
+                                                    : 'rgba(225, 6, 0, 0.1)',
+                                                color: selection
+                                                    ? 'var(--color-success)'
+                                                    : 'var(--color-f1-red)',
+                                            }}
                                         >
-                                            <div className="px-4 pb-4 border-t border-[var(--color-carbon-700)]">
-                                                {cat.type === 'driver' && (
-                                                    <DriverSelector
-                                                        selected={selection || null}
-                                                        onSelect={(name) => {
-                                                            setBets({ ...bets, [cat.id]: name });
-                                                            setOpenCategory(null);
-                                                        }}
-                                                    />
-                                                )}
-                                                {cat.type === 'constructor' && (
-                                                    <ConstructorSelector
-                                                        selected={selection || null}
-                                                        onSelect={(name) => {
-                                                            setBets({ ...bets, [cat.id]: name });
-                                                            setOpenCategory(null);
-                                                        }}
-                                                    />
-                                                )}
-                                                {cat.type === 'race' && (
-                                                    <RaceSelector
-                                                        selected={selection || null}
-                                                        onSelect={(gp) => {
-                                                            setBets({ ...bets, [cat.id]: gp });
-                                                            setOpenCategory(null);
-                                                        }}
-                                                    />
-                                                )}
+                                            {selection ? <CheckCircle size={18} /> : cat.icon}
+                                        </div>
+
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-semibold text-sm">{cat.label}</div>
+                                            <div className="text-xs text-[var(--color-carbon-400)] truncate">
+                                                {selection || cat.description}
                                             </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </motion.div>
-                        );
-                    })}
-                </AnimatePresence>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                            <span className="score-pill text-[10px]">{cat.points}pts</span>
+                                            <ChevronDown
+                                                size={16}
+                                                className={`text-[var(--color-carbon-400)] transition-transform ${isOpen ? 'rotate-180' : ''
+                                                    }`}
+                                            />
+                                        </div>
+                                    </button>
+
+                                    {/* Expanded Selector */}
+                                    <AnimatePresence>
+                                        {isOpen && (
+                                            <motion.div
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: 'auto', opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                transition={{ duration: 0.2 }}
+                                                className="overflow-hidden"
+                                            >
+                                                <div className="px-4 pb-4 border-t border-[var(--color-carbon-700)]">
+                                                    {cat.type === 'driver' && (
+                                                        <DriverSelector
+                                                            selected={selection || null}
+                                                            onSelect={(name) => {
+                                                                setBets({ ...bets, [cat.id]: name });
+                                                                setOpenCategory(null);
+                                                            }}
+                                                        />
+                                                    )}
+                                                    {cat.type === 'constructor' && (
+                                                        <ConstructorSelector
+                                                            selected={selection || null}
+                                                            onSelect={(name) => {
+                                                                setBets({ ...bets, [cat.id]: name });
+                                                                setOpenCategory(null);
+                                                            }}
+                                                        />
+                                                    )}
+                                                    {cat.type === 'race' && (
+                                                        <RaceSelector
+                                                            selected={selection || null}
+                                                            onSelect={(gp) => {
+                                                                setBets({ ...bets, [cat.id]: gp });
+                                                                setOpenCategory(null);
+                                                            }}
+                                                        />
+                                                    )}
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </motion.div>
+                            );
+                        })}
+                    </AnimatePresence>
+                </div>
 
                 {/* Submit Button */}
                 <motion.div
