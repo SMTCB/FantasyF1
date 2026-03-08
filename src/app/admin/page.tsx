@@ -914,21 +914,28 @@ export default function AdminPage() {
                                     <Trophy size={14} className="text-[var(--color-warning)]" />
                                     Driver Championship Final
                                 </h3>
-                                {['Driver Champion (P1)', 'Driver Runner-up (P2)', 'Driver P3'].map((label) => (
-                                    <div key={label}>
-                                        <label className="data-readout text-[9px] block mb-1">{label.toUpperCase()}</label>
-                                        <select
-                                            value={yearResultsForm[label === 'Driver Champion (P1)' ? 'driverChampion' : label === 'Driver Runner-up (P2)' ? 'driverP2' : 'driverP3'] || ''}
-                                            onChange={(e) => handleYearFormChange(label === 'Driver Champion (P1)' ? 'driverChampion' : label === 'Driver Runner-up (P2)' ? 'driverP2' : 'driverP3', e.target.value)}
-                                            className="input-field text-sm"
-                                        >
-                                            <option value="">Select driver...</option>
-                                            {ALL_DRIVERS.map(d => (
-                                                <option key={d.name} value={d.name}>{d.name} ({d.team})</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                ))}
+                                {['Driver Champion (P1)', 'Driver Runner-up (P2)', 'Driver P3'].map((label) => {
+                                    const fieldKey = label === 'Driver Champion (P1)' ? 'driverChampion' : label === 'Driver Runner-up (P2)' ? 'driverP2' : 'driverP3';
+                                    const val = yearResultsForm[fieldKey];
+                                    const isCustom = val && !ALL_DRIVERS.some(d => d.name === val);
+
+                                    return (
+                                        <div key={label}>
+                                            <label className="data-readout text-[9px] block mb-1">{label.toUpperCase()}</label>
+                                            <select
+                                                value={val || ''}
+                                                onChange={(e) => handleYearFormChange(fieldKey, e.target.value)}
+                                                className="input-field text-sm"
+                                            >
+                                                <option value="">Select driver...</option>
+                                                {isCustom && <option value={val}>{val} (Computed)</option>}
+                                                {ALL_DRIVERS.map(d => (
+                                                    <option key={d.name} value={d.name}>{d.name} ({d.team})</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    );
+                                })}
                             </div>
 
                             <div className="glass-card p-4 space-y-3">
@@ -936,21 +943,28 @@ export default function AdminPage() {
                                     <Users size={14} className="text-[var(--color-info)]" />
                                     Constructor Championship Final
                                 </h3>
-                                {['Constructors Champion', 'Last Place Constructor'].map((label) => (
-                                    <div key={label}>
-                                        <label className="data-readout text-[9px] block mb-1">{label.toUpperCase()}</label>
-                                        <select
-                                            value={yearResultsForm[label === 'Constructors Champion' ? 'constructorChampion' : 'lastConstructor'] || ''}
-                                            onChange={(e) => handleYearFormChange(label === 'Constructors Champion' ? 'constructorChampion' : 'lastConstructor', e.target.value)}
-                                            className="input-field text-sm"
-                                        >
-                                            <option value="">Select team...</option>
-                                            {TEAMS.map(t => (
-                                                <option key={t.shortName} value={t.shortName}>{t.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                ))}
+                                {['Constructors Champion', 'Last Place Constructor'].map((label) => {
+                                    const fieldKey = label === 'Constructors Champion' ? 'constructorChampion' : 'lastConstructor';
+                                    const val = yearResultsForm[fieldKey];
+                                    const isCustom = val && !TEAMS.some(t => t.shortName === val);
+
+                                    return (
+                                        <div key={label}>
+                                            <label className="data-readout text-[9px] block mb-1">{label.toUpperCase()}</label>
+                                            <select
+                                                value={val || ''}
+                                                onChange={(e) => handleYearFormChange(fieldKey, e.target.value)}
+                                                className="input-field text-sm"
+                                            >
+                                                <option value="">Select team...</option>
+                                                {isCustom && <option value={val}>{val} (Computed)</option>}
+                                                {TEAMS.map(t => (
+                                                    <option key={t.shortName} value={t.shortName}>{t.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    );
+                                })}
                             </div>
 
                             <div className="glass-card p-4 space-y-3">
@@ -964,27 +978,38 @@ export default function AdminPage() {
                                     { label: 'First Driver Replaced', type: 'driver', id: 'firstDriverReplaced' },
                                     { label: 'Most Pole Positions', type: 'driver', id: 'mostPoles' },
                                     { label: 'Most Podiums Without a Win', type: 'driver', id: 'mostPodiumsNoWin' },
-                                ].map((cat) => (
-                                    <div key={cat.id}>
-                                        <label className="data-readout text-[9px] block mb-1">{cat.label.toUpperCase()}</label>
-                                        <select
-                                            value={yearResultsForm[cat.id as keyof YearResult] || ''}
-                                            onChange={(e) => handleYearFormChange(cat.id as keyof YearResult, e.target.value)}
-                                            className="input-field text-sm"
-                                        >
-                                            <option value="">Select...</option>
-                                            {cat.type === 'driver' && ALL_DRIVERS.map(d => (
-                                                <option key={d.name} value={d.name}>{d.name}</option>
-                                            ))}
-                                            {cat.type === 'team' && TEAMS.map(t => (
-                                                <option key={t.shortName} value={t.shortName}>{t.shortName}</option>
-                                            ))}
-                                            {cat.type === 'race' && CALENDAR.map(r => (
-                                                <option key={r.round} value={r.gp}>{r.gp}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                ))}
+                                ].map((cat) => {
+                                    const val = yearResultsForm[cat.id as keyof YearResult] as string;
+                                    let isCustom = false;
+                                    if (val) {
+                                        if (cat.type === 'driver') isCustom = !ALL_DRIVERS.some(d => d.name === val);
+                                        if (cat.type === 'team') isCustom = !TEAMS.some(t => t.shortName === val);
+                                        if (cat.type === 'race') isCustom = !CALENDAR.some(r => r.gp === val);
+                                    }
+
+                                    return (
+                                        <div key={cat.id}>
+                                            <label className="data-readout text-[9px] block mb-1">{cat.label.toUpperCase()}</label>
+                                            <select
+                                                value={val || ''}
+                                                onChange={(e) => handleYearFormChange(cat.id as keyof YearResult, e.target.value)}
+                                                className="input-field text-sm"
+                                            >
+                                                <option value="">Select...</option>
+                                                {isCustom && <option value={val}>{val} (Computed tie)</option>}
+                                                {cat.type === 'driver' && ALL_DRIVERS.map(d => (
+                                                    <option key={d.name} value={d.name}>{d.name}</option>
+                                                ))}
+                                                {cat.type === 'team' && TEAMS.map(t => (
+                                                    <option key={t.shortName} value={t.shortName}>{t.shortName}</option>
+                                                ))}
+                                                {cat.type === 'race' && CALENDAR.map(r => (
+                                                    <option key={r.round} value={r.gp}>{r.gp}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    );
+                                })}
                             </div>
 
                             <div className="telemetry-border p-5 space-y-4">

@@ -141,27 +141,13 @@ export function computeYearStats(
         .sort();
     const mostPodiumsNoWin = noWinTied.length > 0 ? noWinTied.join(',') : null;
 
-    // ── 4. Championship standings (beta) ──
-    // Sort by position_current ascending
-    const sortedDriverChamp = [...(champDrivers || [])].sort(
-        (a: any, b: any) => (a.position_current ?? 999) - (b.position_current ?? 999)
-    );
+    // ── 4. Championship standings (beta + fallback) ──
+    let driverChampion: string | null = null;
+    let driverP2: string | null = null;
+    let driverP3: string | null = null;
+    let constructorChampion: string | null = null;
+    let lastConstructor: string | null = null;
 
-    const champDriverNames = sortedDriverChamp
-        .slice(0, 3)
-        .map((d: any) => resolve(d.driver_number))
-        .filter(Boolean) as string[];
-
-    const driverChampion = champDriverNames[0] ?? null;
-    const driverP2 = champDriverNames[1] ?? null;
-    const driverP3 = champDriverNames[2] ?? null;
-
-    // Sort teams by position_current ascending
-    const sortedTeamChamp = [...(champTeams || [])].sort(
-        (a: any, b: any) => (a.position_current ?? 999) - (b.position_current ?? 999)
-    );
-
-    // Map OpenF1 team name → our shortName
     const resolveTeam = (openf1Name: string): string | null => {
         if (!openf1Name) return null;
         const lower = openf1Name.toLowerCase();
@@ -174,12 +160,80 @@ export function computeYearStats(
         return team?.shortName ?? openf1Name;
     };
 
-    const constructorChampion = sortedTeamChamp[0]?.team_name
-        ? resolveTeam(sortedTeamChamp[0].team_name)
-        : null;
-    const lastConstructor = sortedTeamChamp[sortedTeamChamp.length - 1]?.team_name
-        ? resolveTeam(sortedTeamChamp[sortedTeamChamp.length - 1].team_name)
-        : null;
+    if (champDrivers && champDrivers.length > 0) {
+        // Sort by position_current ascending
+        const sortedDriverChamp = [...champDrivers].sort(
+            (a: any, b: any) => (a.position_current ?? 999) - (b.position_current ?? 999)
+        );
+        const champDriverNames = sortedDriverChamp
+            .slice(0, 3)
+            .map((d: any) => resolve(d.driver_number))
+            .filter(Boolean) as string[];
+
+        driverChampion = champDriverNames[0] ?? null;
+        driverP2 = champDriverNames[1] ?? null;
+        driverP3 = champDriverNames[2] ?? null;
+    } else {
+        // Fallback: manually calculate driver standings from race results points
+        const manualDriverPoints: Record<string, number> = {};
+        raceResults.forEach((r: any) => {
+            const name = resolve(r.driver_number);
+            if (name && r.points) {
+                manualDriverPoints[name] = (manualDriverPoints[name] || 0) + Number(r.points);
+            }
+        });
+        const sortedManualDrivers = Object.entries(manualDriverPoints)
+            .sort((a, b) => b[1] - a[1]) // sort descending by points
+            .map(entry => entry[0]);
+
+        driverChampion = sortedManualDrivers[0] ?? null;
+        driverP2 = sortedManualDrivers[1] ?? null;
+        driverP3 = sortedManualDrivers[2] ?? null;
+    }
+
+    if (champTeams && champTeams.length > 0) {
+        // Sort teams by position_current ascending
+        const sortedTeamChamp = [...champTeams].sort(
+            (a: any, b: any) => (a.position_current ?? 999) - (b.position_current ?? 999)
+        );
+
+        constructorChampion = sortedTeamChamp[0]?.team_name
+            ? resolveTeam(sortedTeamChamp[0].team_name)
+            : null;
+        lastConstructor = sortedTeamChamp[sortedTeamChamp.length - 1]?.team_name
+            ? resolveTeam(sortedTeamChamp[sortedTeamChamp.length - 1].team_name)
+            : null;
+    } else {
+        // Fallback: manually calculate team standings from race results points
+        const manualTeamPoints: Record<string, number> = {};
+        raceResults.forEach((r: any) => {
+            const name = resolve(r.driver_number);
+            if (name && r.points) {
+                const { ALL_DRIVERS } = require('./f1-data');
+                const driverObj = ALL_DRIVERS.find((d: any) => d.name === name);
+                const teamName = driverObj?.team;
+                if (teamName) {
+                    manualTeamPoints[teamName] = (manualTeamPoints[teamName] || 0) + Number(r.points);
+                }
+            }
+        });
+        const sortedManualTeams = Object.entries(manualTeamPoints)
+            .sort((a, b) => b[1] - a[1])
+            .map(entry => entry[0]);
+
+        if (sortedManualTeams.length > 0) {
+            constructorChampion = sortedManualTeams[0] ?? null;
+            // Get the last team that actually scored points (or just theoretically last of the known teams)
+            // If they want the last team in the grid, we need all 10 teams...
+            const { TEAMS } = require('./f1-data');
+            const allTeamNames = (TEAMS as any[]).map(t => t.shortName);
+            const teamPointsFull = allTeamNames.map(t => ({ team: t, pts: manualTeamPoints[t] || 0 }));
+            teamPointsFull.sort((a, b) => b.pts - a.pts);
+
+            constructorChampion = resolveTeam(teamPointsFull[0]?.team) ?? null;
+            lastConstructor = resolveTeam(teamPointsFull[teamPointsFull.length - 1]?.team) ?? null;
+        }
+    }
 
     // ── Count unique sessions (rough approximation of races aggregated) ──
     const uniqueRaceSessions = new Set(raceResults.map((r: any) => r.session_key)).size;
