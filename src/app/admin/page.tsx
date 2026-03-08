@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { CALENDAR, ALL_DRIVERS, TEAMS, YEAR_BET_SCORING, ROUND_TO_COUNTRY } from '@/lib/f1-data';
-import { fetchRaceSession, fetchRaceResults } from '@/lib/openf1';
+import { fetchRaceSession, fetchRaceResults, fetchDrivers } from '@/lib/openf1';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useCallback } from 'react';
 import { scoreRaceBet, scoreYearBet, type RaceBet, type RaceResult, type YearBet, type YearResult } from '@/lib/scoring';
@@ -367,17 +367,47 @@ export default function AdminPage() {
         try {
             const session = await fetchRaceSession(year, country);
             if (session) {
-                const results = await fetchRaceResults(session.session_key);
-                // Results is an array of objects like { position: 1, driver_number: 1, ... }
-                // For a robust implementation, you would map driver_number to driver names.
-                // For now, let's just show a toast that the API call was made successfully.
-                // In production, matching openf1 driver_number/broadcast_name to our ALL_DRIVERS is required.
-                handleSave(`R${round} API synced (Mock mapping)`);
-                // Example mock assignment:
-                /*
-                handleFormChange(round, 'p1', 'Max Verstappen');
-                handleFormChange(round, 'p2', 'Lando Norris');
-                */
+                const [positions, driverInfo] = await Promise.all([
+                    fetchRaceResults(session.session_key),
+                    fetchDrivers(session.session_key)
+                ]);
+
+                if (!positions || positions.length === 0) {
+                    alert("Race in progress or results not yet available.");
+                    return;
+                }
+
+                const latestPositions = new Map();
+                positions.forEach((p: any) => {
+                    const current = latestPositions.get(p.driver_number);
+                    if (!current || new Date(p.date) > new Date(current.date)) {
+                        latestPositions.set(p.driver_number, p);
+                    }
+                });
+
+                const sortedDrivers = Array.from(latestPositions.values()).sort((a, b) => a.position - b.position);
+
+                const getOurDriverName = (driverNum: number) => {
+                    const dInfo = driverInfo.find((d: any) => d.driver_number === driverNum);
+                    if (!dInfo) return undefined;
+                    const lastName = (dInfo.name_acronym || dInfo.broadcast_name?.split(' ').pop() || '').toLowerCase();
+                    const fallbackLastName = dInfo.full_name?.split(' ').pop()?.toLowerCase() || 'xxx';
+                    const found = ALL_DRIVERS.find(d => {
+                        const ourNormalized = d.name.toLowerCase();
+                        return ourNormalized.includes(lastName) || ourNormalized.includes(fallbackLastName);
+                    });
+                    return found?.name;
+                };
+
+                const p1 = getOurDriverName(sortedDrivers[0]?.driver_number);
+                const p2 = getOurDriverName(sortedDrivers[1]?.driver_number);
+                const p3 = getOurDriverName(sortedDrivers[2]?.driver_number);
+
+                if (p1) handleFormChange(round, 'p1', p1);
+                if (p2) handleFormChange(round, 'p2', p2);
+                if (p3) handleFormChange(round, 'p3', p3);
+
+                handleSave(`R${round} API synced successfully`);
             } else {
                 alert("Race session not found on OpenF1 API yet.");
             }
@@ -574,23 +604,31 @@ export default function AdminPage() {
 
                                                     {/* DNF Drivers */}
                                                     <div>
-                                                        <label className="data-readout text-[9px] block mb-1">
-                                                            DNF DRIVERS (Hold Ctrl/Cmd to select multiple)
+                                                        <label className="data-readout text-[9px] block mb-2">
+                                                            DNF DRIVERS
                                                         </label>
-                                                        <select
-                                                            multiple
-                                                            size={5}
-                                                            value={resultsForm[race.round]?.dnf || []}
-                                                            onChange={(e) => {
-                                                                const selected = Array.from(e.target.selectedOptions, option => option.value);
-                                                                handleDnfChange(race.round, selected);
-                                                            }}
-                                                            className="input-field text-sm"
-                                                        >
-                                                            {ALL_DRIVERS.map(d => (
-                                                                <option key={d.name} value={d.name}>{d.name} ({d.team})</option>
-                                                            ))}
-                                                        </select>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {ALL_DRIVERS.map(d => {
+                                                                const isSelected = (resultsForm[race.round]?.dnf || []).includes(d.name);
+                                                                return (
+                                                                    <button
+                                                                        key={d.name}
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            const current = resultsForm[race.round]?.dnf || [];
+                                                                            if (isSelected) {
+                                                                                handleDnfChange(race.round, current.filter(x => x !== d.name));
+                                                                            } else {
+                                                                                handleDnfChange(race.round, [...current, d.name]);
+                                                                            }
+                                                                        }}
+                                                                        className={`text-[10px] px-2.5 py-1.5 rounded-md border transition-colors flex items-center gap-1.5 ${isSelected ? 'bg-[var(--color-danger)]/20 border-[var(--color-danger)] text-white font-bold' : 'bg-[var(--color-carbon-800)] border-[var(--color-carbon-700)] text-[var(--color-carbon-400)] hover:border-[var(--color-carbon-500)]'}`}
+                                                                    >
+                                                                        {d.name} <span className="opacity-50 text-[8px] font-normal">({d.team})</span>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
                                                     </div>
 
                                                     {/* Team Most Points */}
