@@ -20,10 +20,15 @@ import {
     Calendar,
     Database,
     Users,
+    TrendingUp,
 } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { CALENDAR, ALL_DRIVERS, TEAMS, YEAR_BET_SCORING, ROUND_TO_COUNTRY } from '@/lib/f1-data';
-import { fetchRaceSession, fetchSessionResult, fetchDrivers } from '@/lib/openf1';
+import {
+    fetchRaceSession, fetchSessionResult, fetchDrivers,
+    fetchChampionshipDrivers, fetchChampionshipTeams, fetchAllSeasonResults
+} from '@/lib/openf1';
+import { computeYearStats, type ComputedYearStats } from '@/lib/year-stats';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useCallback } from 'react';
 import { scoreRaceBet, scoreYearBet, type RaceBet, type RaceResult, type YearBet, type YearResult } from '@/lib/scoring';
@@ -50,6 +55,10 @@ export default function AdminPage() {
 
     // Year results form state
     const [yearResultsForm, setYearResultsForm] = useState<Partial<YearResult>>({});
+    // Preliminary year stats state (computed from API)
+    const [prelimYearStats, setPrelimYearStats] = useState<ComputedYearStats | null>(null);
+    // Track which round last triggered a year stats computation
+    const [prelimRound, setPrelimRound] = useState<number | null>(null);
 
     const supabase = createClient();
 
@@ -367,9 +376,21 @@ export default function AdminPage() {
         try {
             const session = await fetchRaceSession(year, country);
             if (session) {
-                const [classification, driverInfo] = await Promise.all([
+                // Fetch race classification AND season-wide data in parallel
+                const [
+                    classification,
+                    driverInfo,
+                    raceSeasonResults,
+                    qualSeasonResults,
+                    champDrivers,
+                    champTeams,
+                ] = await Promise.all([
                     fetchSessionResult(session.session_key),
-                    fetchDrivers(session.session_key)
+                    fetchDrivers(session.session_key),
+                    fetchAllSeasonResults(year, 'Race'),
+                    fetchAllSeasonResults(year, 'Qualifying'),
+                    fetchChampionshipDrivers(year),
+                    fetchChampionshipTeams(year),
                 ]);
 
                 if (!classification || classification.length === 0) {
@@ -702,6 +723,68 @@ export default function AdminPage() {
                                                         <Database size={12} />
                                                         Save Results & Score
                                                     </button>
+
+                                                    {/* Preliminary Year Stats Display */}
+                                                    {prelimYearStats && prelimRound === race.round && (
+                                                        <div className="mt-4 p-3 rounded-md bg-[var(--color-carbon-800)] border border-[var(--color-f1-red)]/20">
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <TrendingUp size={14} className="text-[var(--color-f1-red)]" />
+                                                                <span className="data-readout text-[10px] text-[var(--color-f1-red)]">PRELIMINARY YEAR STATS</span>
+                                                            </div>
+                                                            <div className="space-y-1 text-xs">
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-[var(--color-carbon-400)]">Championship P1:</span>
+                                                                    <span className="font-semibold">{prelimYearStats.driverChampion || '—'}</span>
+                                                                </div>
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-[var(--color-carbon-400)]">Championship P2:</span>
+                                                                    <span className="font-semibold">{prelimYearStats.driverP2 || '—'}</span>
+                                                                </div>
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-[var(--color-carbon-400)]">Championship P3:</span>
+                                                                    <span className="font-semibold">{prelimYearStats.driverP3 || '—'}</span>
+                                                                </div>
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-[var(--color-carbon-400)]">Constructor Champ:</span>
+                                                                    <span className="font-semibold">{prelimYearStats.constructorChampion || '—'}</span>
+                                                                </div>
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-[var(--color-carbon-400)]">Last Constructor:</span>
+                                                                    <span className="font-semibold">{prelimYearStats.lastConstructor || '—'}</span>
+                                                                </div>
+                                                                <div className="flex justify-between items-center pt-1 border-t border-[var(--color-carbon-700)] mt-1">
+                                                                    <span className="text-[var(--color-carbon-400)]">Most DNFs:</span>
+                                                                    <span className="font-semibold text-right flex flex-col items-end">
+                                                                        <span>{prelimYearStats.mostDnfsDriver || '—'} ({prelimYearStats.mostDnfsCount})</span>
+                                                                        {prelimYearStats.mostDnfsTied.length > 1 && (
+                                                                            <span className="text-[10px] text-[var(--color-warning)] font-normal">Tied: {prelimYearStats.mostDnfsTied.join(', ')}</span>
+                                                                        )}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex justify-between items-center">
+                                                                    <span className="text-[var(--color-carbon-400)]">Most Poles:</span>
+                                                                    <span className="font-semibold text-right flex flex-col items-end">
+                                                                        <span>{prelimYearStats.mostPoles || '—'} ({prelimYearStats.mostPolesCount})</span>
+                                                                        {prelimYearStats.mostPolesTied.length > 1 && (
+                                                                            <span className="text-[10px] text-[var(--color-warning)] font-normal">Tied: {prelimYearStats.mostPolesTied.join(', ')}</span>
+                                                                        )}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex justify-between items-center">
+                                                                    <span className="text-[var(--color-carbon-400)]">Most Podiums (No Win):</span>
+                                                                    <span className="font-semibold text-right flex flex-col items-end">
+                                                                        <span>{prelimYearStats.mostPodiumsNoWin || '—'} ({prelimYearStats.mostPodiumsNoWinCount})</span>
+                                                                        {prelimYearStats.mostPodiumsNoWinTied.length > 1 && (
+                                                                            <span className="text-[10px] text-[var(--color-warning)] font-normal">Tied: {prelimYearStats.mostPodiumsNoWinTied.join(', ')}</span>
+                                                                        )}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-[9px] text-[var(--color-carbon-500)] text-right mt-2">
+                                                                Aggregated {prelimYearStats.racesAggregated} race(s) & {prelimYearStats.qualifyingAggregated} qual(s)
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </motion.div>
                                         )}

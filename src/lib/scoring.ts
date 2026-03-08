@@ -151,30 +151,57 @@ export interface YearScore {
 }
 
 /**
- * Score year bets against actual results
+ * Score year bets against actual results.
+ * 
+ * For `mostDnfsDriver`, `mostPoles`, and `mostPodiumsNoWin`, the result value
+ * may be a comma-separated list of tied drivers (e.g. "Hamilton,Russell").
+ * A user's bet is considered correct if their pick matches ANY of the tied values.
  */
 export function scoreYearBet(bet: YearBet, result: YearResult): YearScore {
     const breakdown: Record<string, number> = {};
     let total = 0;
 
-    const checks: [string, keyof YearBet, keyof typeof YEAR_BET_SCORING][] = [
+    // Fields with exact-match scoring
+    const exactChecks: [string, keyof YearBet, keyof typeof YEAR_BET_SCORING][] = [
         ['Driver Champion', 'driverChampion', 'DRIVER_CHAMPION'],
         ['Driver P2', 'driverP2', 'DRIVER_P2'],
         ['Driver P3', 'driverP3', 'DRIVER_P3'],
         ['Constructor Champion', 'constructorChampion', 'CONSTRUCTOR_CHAMPION'],
         ['Last Constructor', 'lastConstructor', 'LAST_CONSTRUCTOR'],
         ['Fewest Finishers Race', 'fewestFinishersRace', 'FEWEST_FINISHERS_RACE'],
-        ['Most DNFs Driver', 'mostDnfsDriver', 'MOST_DNFS_DRIVER'],
         ['First Driver Replaced', 'firstDriverReplaced', 'FIRST_DRIVER_REPLACED'],
+    ];
+
+    exactChecks.forEach(([label, betKey, scoreKey]) => {
+        if (bet[betKey] && result[betKey] && bet[betKey] === result[betKey]) {
+            const pts = YEAR_BET_SCORING[scoreKey];
+            breakdown[label] = pts;
+            total += pts;
+        } else {
+            breakdown[label] = 0;
+        }
+    });
+
+    // Fields with tie-aware scoring (result may be comma-separated)
+    const tieChecks: [string, keyof YearBet, keyof typeof YEAR_BET_SCORING][] = [
+        ['Most DNFs Driver', 'mostDnfsDriver', 'MOST_DNFS_DRIVER'],
         ['Most Poles', 'mostPoles', 'MOST_POLES'],
         ['Most Podiums No Win', 'mostPodiumsNoWin', 'MOST_PODIUMS_NO_WIN'],
     ];
 
-    checks.forEach(([label, betKey, scoreKey]) => {
-        if (bet[betKey] === result[betKey]) {
-            const pts = YEAR_BET_SCORING[scoreKey];
-            breakdown[label] = pts;
-            total += pts;
+    tieChecks.forEach(([label, betKey, scoreKey]) => {
+        const betValue = bet[betKey];
+        const resultValue = result[betKey];
+        if (betValue && resultValue) {
+            // Split comma-separated tied values and check if bet is among them
+            const tiedValues = resultValue.split(',').map(s => s.trim());
+            if (tiedValues.includes(betValue)) {
+                const pts = YEAR_BET_SCORING[scoreKey];
+                breakdown[label] = pts;
+                total += pts;
+            } else {
+                breakdown[label] = 0;
+            }
         } else {
             breakdown[label] = 0;
         }

@@ -109,4 +109,38 @@ test.describe('Scoring Engine Unit Tests', () => {
 
         expect(score.total).toBe(250 + 150 + 100 + 100 + 100 + 150 + 125); // 975
     });
+
+    test('Year Bet - Tie Cases (Comma-separated values)', () => {
+        const bet1: YearBet = {
+            mostDnfsDriver: 'George Russell',
+            mostPoles: 'Lando Norris',
+            mostPodiumsNoWin: 'Oscar Piastri',
+            // other fields omitted but typings require them conceptually so we cast
+        } as YearBet;
+
+        const bet2: YearBet = {
+            mostDnfsDriver: 'Lewis Hamilton',
+            mostPoles: 'Max Verstappen',
+            mostPodiumsNoWin: 'Charles Leclerc', // wrong
+        } as YearBet;
+
+        const result: YearResult = {
+            mostDnfsDriver: 'Lewis Hamilton, George Russell', // tied
+            mostPoles: 'Max Verstappen, Lando Norris', // tied
+            mostPodiumsNoWin: 'Oscar Piastri, Fernando Alonso', // tied
+        } as YearResult;
+
+        const score1 = scoreYearBet(bet1, result);
+        const score2 = scoreYearBet(bet2, result);
+
+        // bet1 guessed Russell (tied/correct), Norris (tied/correct), Piastri (tied/correct)
+        expect(score1.breakdown['Most DNFs Driver']).toBe(100);
+        expect(score1.breakdown['Most Poles']).toBe(100);
+        expect(score1.breakdown['Most Podiums No Win']).toBe(125);
+
+        // bet2 guessed Hamilton (tied/correct), Verstappen (tied/correct), Leclerc (incorrect)
+        expect(score2.breakdown['Most DNFs Driver']).toBe(100);
+        expect(score2.breakdown['Most Poles']).toBe(100);
+        expect(score2.breakdown['Most Podiums No Win']).toBe(0);
+    });
 });

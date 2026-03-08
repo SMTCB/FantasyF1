@@ -7,6 +7,8 @@ export interface LeaderboardEntry {
     userId: string;
     displayName: string;
     totalPoints: number;
+    racePoints?: number;
+    yearPoints?: number;
     previousPosition?: number;
     avatarEmoji?: string;
 }
@@ -53,12 +55,12 @@ export default function Leaderboard({ entries }: LeaderboardProps) {
                             {/* Position */}
                             <div
                                 className={`position-badge ${position === 1
-                                        ? 'p1'
-                                        : position === 2
-                                            ? 'p2'
-                                            : position === 3
-                                                ? 'p3'
-                                                : ''
+                                    ? 'p1'
+                                    : position === 2
+                                        ? 'p2'
+                                        : position === 3
+                                            ? 'p3'
+                                            : ''
                                     }`}
                                 style={
                                     position > 3
@@ -82,6 +84,11 @@ export default function Leaderboard({ entries }: LeaderboardProps) {
                                 <div className="font-semibold text-sm truncate">
                                     {entry.displayName}
                                 </div>
+                                {(entry.yearPoints !== undefined && entry.yearPoints > 0) && (
+                                    <div className="text-[10px] text-[var(--color-carbon-400)] mt-0.5">
+                                        {(entry.racePoints ?? 0)} race + <span className="text-[var(--color-warning)] font-medium">{(entry.yearPoints ?? 0)} year*</span>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Trend */}

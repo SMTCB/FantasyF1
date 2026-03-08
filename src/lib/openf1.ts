@@ -115,3 +115,75 @@ export async function fetchSessionResult(sessionKey: number) {
         return [];
     }
 }
+
+/**
+ * Fetch championship driver standings (Beta endpoint)
+ */
+export async function fetchChampionshipDrivers(year: number) {
+    try {
+        const res = await fetch(
+            `${OPENF1_BASE}/championship_drivers?year=${year}`,
+            { next: { revalidate: 300 } }
+        );
+        if (!res.ok) return [];
+        return res.json();
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Fetch championship team standings (Beta endpoint)
+ */
+export async function fetchChampionshipTeams(year: number) {
+    try {
+        const res = await fetch(
+            `${OPENF1_BASE}/championship_teams?year=${year}`,
+            { next: { revalidate: 300 } }
+        );
+        if (!res.ok) return [];
+        return res.json();
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Fetch all session results for every race (or qualifying) session in a year.
+ * Returns a flat array of [{ session_key, session_type, results[] }] objects.
+ */
+export async function fetchAllSeasonResults(year: number, sessionType: 'Race' | 'Qualifying') {
+    try {
+        // 1. Get all sessions of the requested type for the year
+        const sessionsRes = await fetch(
+            `${OPENF1_BASE}/sessions?year=${year}&session_type=${sessionType}`,
+            { next: { revalidate: 300 } }
+        );
+        if (!sessionsRes.ok) return [];
+        const sessions: SessionInfo[] = await sessionsRes.json();
+
+        if (!sessions || sessions.length === 0) return [];
+
+        // 2. Fetch session_result for each session in parallel
+        const allResults = await Promise.all(
+            sessions.map(async (sess) => {
+                try {
+                    const res = await fetch(
+                        `${OPENF1_BASE}/session_result?session_key=${sess.session_key}`,
+                        { next: { revalidate: 300 } }
+                    );
+                    if (!res.ok) return [];
+                    const data = await res.json();
+                    return data as any[];
+                } catch {
+                    return [];
+                }
+            })
+        );
+
+        // Flatten into a single array, tagging each record with the session_key
+        return allResults.flat();
+    } catch {
+        return [];
+    }
+}

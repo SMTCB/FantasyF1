@@ -48,6 +48,8 @@ export default function DashboardPage() {
                     userId: row.user_id,
                     displayName: row.display_name,
                     totalPoints: row.total_points,
+                    racePoints: row.race_points || 0,
+                    yearPoints: row.year_points || 0,
                     avatarEmoji: row.avatar_emoji || '🏎️'
                 }));
 
