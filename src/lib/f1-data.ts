@@ -139,8 +139,15 @@ export function getRaceByRound(round: number): Race | undefined {
 }
 
 export function getNextRace(): Race | undefined {
-    const now = new Date();
-    return CALENDAR.find(r => new Date(r.date) >= now);
+    // Current date set to start of day for comparison
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return CALENDAR.find(r => {
+        const raceDate = new Date(r.date);
+        raceDate.setHours(0, 0, 0, 0);
+        return raceDate >= today;
+    });
 }
 
 // Scoring constants
