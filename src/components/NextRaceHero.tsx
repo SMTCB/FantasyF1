@@ -72,8 +72,17 @@ export default function NextRaceHero() {
                     <span>Round {nextRace.round}/{totalRaces}</span>
                 </div>
                 <div className="data-readout flex items-center gap-2">
-                    <span className="inline-block w-2 h-2 rounded-full bg-[var(--color-success)] animate-pulse" />
-                    <span>BETS OPEN</span>
+                    {countdown.expired ? (
+                        <>
+                            <span className="inline-block w-2 h-2 rounded-full bg-[var(--color-f1-red)]" />
+                            <span>BETS LOCKED</span>
+                        </>
+                    ) : (
+                        <>
+                            <span className="inline-block w-2 h-2 rounded-full bg-[var(--color-success)] animate-pulse" />
+                            <span>BETS OPEN</span>
+                        </>
+                    )}
                 </div>
             </div>
 

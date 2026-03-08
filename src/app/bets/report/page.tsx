@@ -52,6 +52,7 @@ export default function BetsReportPage() {
     const [selectedRound, setSelectedRound] = useState<number>(0);
     const [raceLockStatus, setRaceLockStatus] = useState<Record<number, boolean>>({});
     const [raceBets, setRaceBets] = useState<any[]>([]);
+    const [raceScores, setRaceScores] = useState<any[]>([]);
     const supabase = createClient();
 
     useEffect(() => {
@@ -88,7 +89,7 @@ export default function BetsReportPage() {
                 }
 
                 // 4. Fetch Race Statuses (which races are locked)
-                const { data: racesData } = await supabase.from('races').select('round, session_start, is_manual_unlock');
+                const { data: racesData } = await supabase.from('races').select('round, session_start, is_manual_unlock, is_scored');
                 const lockMap: Record<number, boolean> = {};
                 let latestClosedRound = 1;
 
@@ -118,6 +119,10 @@ export default function BetsReportPage() {
                 // 5. Fetch ALL race bets
                 const { data: rBets } = await supabase.from('bets_race').select('*');
                 if (rBets) setRaceBets(rBets);
+
+                // 6. Fetch scores for all races
+                const { data: sData } = await supabase.from('scores').select('user_id, round, podium_p1_pts, podium_p2_pts, podium_p3_pts, dnf_pts, team_pts, special_pts, total_points').eq('score_type', 'race');
+                if (sData) setRaceScores(sData);
 
             } catch (err) {
                 console.error("Error fetching report data", err);
@@ -268,29 +273,50 @@ export default function BetsReportPage() {
 
                             return betsForRace.map(bet => {
                                 const user = usersMap[bet.user_id] || { displayName: 'Unknown Racer', avatar: '🏁' };
+                                const scoreEntry = raceScores.find(s => s.user_id === bet.user_id && s.round === selectedRound);
+                                const isScored = !!scoreEntry;
+
+                                const getPointsColor = (pts: number | undefined) => {
+                                    if (!isScored) return '';
+                                    return (pts && pts > 0) ? 'text-[var(--color-success)] glow-green' : 'text-[var(--color-danger)]';
+                                };
+                                const getPointsIndicator = (pts: number | undefined) => {
+                                    if (!isScored) return null;
+                                    return (
+                                        <div className={`text-[9px] mt-0.5 ${(pts && pts > 0) ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>
+                                            {pts} pts
+                                        </div>
+                                    );
+                                };
 
                                 return (
-                                    <div key={bet.user_id} className="glass-card p-4">
+                                    <div key={bet.user_id} className={`glass-card p-4 ${isScored ? 'border-l-4 border-l-[var(--color-carbon-700)]' : ''}`}>
                                         <div className="flex items-center gap-3 mb-3 border-b border-[var(--color-carbon-700)] pb-3">
                                             <div className="w-6 h-6 rounded-full bg-[var(--color-carbon-700)] flex items-center justify-center text-xs">
                                                 {user.avatar}
                                             </div>
                                             <div className="font-semibold text-sm">{user.displayName}</div>
+                                            {isScored && (
+                                                <div className="ml-auto font-mono text-xs font-bold text-[var(--color-success)]">
+                                                    {scoreEntry.total_points} PTS
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="grid grid-cols-3 gap-2 mb-3">
                                             {[
-                                                { label: 'P1', val: bet.p1, icon: <Trophy size={12} className="text-[var(--color-warning)]" /> },
-                                                { label: 'P2', val: bet.p2, icon: <Medal size={12} className="text-[var(--color-carbon-300)]" /> },
-                                                { label: 'P3', val: bet.p3, icon: <Medal size={12} className="text-[var(--color-carbon-500)]" /> },
+                                                { label: 'P1', val: bet.p1, icon: <Trophy size={12} className="text-[var(--color-warning)]" />, pts: scoreEntry?.podium_p1_pts },
+                                                { label: 'P2', val: bet.p2, icon: <Medal size={12} className="text-[var(--color-carbon-300)]" />, pts: scoreEntry?.podium_p2_pts },
+                                                { label: 'P3', val: bet.p3, icon: <Medal size={12} className="text-[var(--color-carbon-500)]" />, pts: scoreEntry?.podium_p3_pts },
                                             ].map(p => (
-                                                <div key={p.label} className="telemetry-border p-2 text-center bg-[var(--color-carbon-800)]/30">
+                                                <div key={p.label} className={`telemetry-border p-2 text-center bg-[var(--color-carbon-800)]/30 ${isScored && p.pts > 0 ? 'border border-[var(--color-success)]/40' : (isScored ? 'border border-[var(--color-danger)]/40' : '')}`}>
                                                     <div className="data-readout text-[8px] flex justify-center gap-1 mb-1 items-center">
                                                         {p.icon} {p.label}
                                                     </div>
-                                                    <div className="text-[11px] font-semibold truncate leading-tight h-4" title={p.val}>
+                                                    <div className={`text-[11px] font-semibold truncate leading-tight ${getPointsColor(p.pts)}`} title={p.val}>
                                                         {p.val || '—'}
                                                     </div>
+                                                    {getPointsIndicator(p.pts)}
                                                 </div>
                                             ))}
                                         </div>
@@ -300,13 +326,19 @@ export default function BetsReportPage() {
                                                 <span className="text-[var(--color-carbon-400)] flex items-center gap-1.5">
                                                     <AlertTriangle size={12} /> DNF
                                                 </span>
-                                                <span className="font-semibold text-right max-w-[150px] truncate">{bet.dnf_driver || '—'}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`font-semibold text-right max-w-[130px] truncate ${getPointsColor(scoreEntry?.dnf_pts)}`}>{bet.dnf_driver || '—'}</span>
+                                                    {isScored && <span className={`text-[10px] w-8 text-right ${(scoreEntry?.dnf_pts > 0) ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>{scoreEntry.dnf_pts}pts</span>}
+                                                </div>
                                             </div>
                                             <div className="flex items-center justify-between text-xs">
                                                 <span className="text-[var(--color-carbon-400)] flex items-center gap-1.5">
                                                     <Users size={12} /> Team (Pts)
                                                 </span>
-                                                <span className="font-semibold text-right max-w-[150px] truncate">{bet.team_most_points || '—'}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`font-semibold text-right max-w-[130px] truncate ${getPointsColor(scoreEntry?.team_pts)}`}>{bet.team_most_points || '—'}</span>
+                                                    {isScored && <span className={`text-[10px] w-8 text-right ${(scoreEntry?.team_pts > 0) ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>{scoreEntry.team_pts}pts</span>}
+                                                </div>
                                             </div>
                                             <div className="flex items-center justify-between text-xs mt-1">
                                                 <span className="text-[var(--color-carbon-400)] flex items-start gap-1.5 w-full">
@@ -315,9 +347,12 @@ export default function BetsReportPage() {
                                                         <span className="block truncate max-w-[180px]" title={raceInfo.specialCategory.question}>{raceInfo.specialCategory.question}</span>
                                                     </div>
                                                 </span>
-                                                <span className="font-semibold text-[var(--color-success)] text-right max-w-[100px] truncate flex-shrink-0">
-                                                    {bet.special_category_answer || '—'}
-                                                </span>
+                                                <div className="flex items-center gap-2 flex-shrink-0">
+                                                    <span className={`font-semibold text-right max-w-[100px] truncate ${getPointsColor(scoreEntry?.special_pts) || 'text-[var(--color-success)]'}`}>
+                                                        {bet.special_category_answer || '—'}
+                                                    </span>
+                                                    {isScored && <span className={`text-[10px] w-8 text-right ${(scoreEntry?.special_pts > 0) ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>{scoreEntry.special_pts}pts</span>}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

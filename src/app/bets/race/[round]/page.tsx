@@ -388,6 +388,7 @@ export default function RaceBetPage() {
                                             isSelected={isSelected}
                                             position={isP1 ? 'P1' : isP2 ? 'P2' : isP3 ? 'P3' : undefined}
                                             onSelect={() => {
+                                                if (submitted || isRaceLocked) return;
                                                 // Cycle through positions: first click = P1, second = P2, etc.
                                                 if (isP1) { setP1(null); return; }
                                                 if (isP2) { setP2(null); return; }
@@ -424,7 +425,10 @@ export default function RaceBetPage() {
                                             key={driver.name}
                                             driver={driver}
                                             isSelected={dnf === driver.name}
-                                            onSelect={() => setDnf(dnf === driver.name ? null : driver.name)}
+                                            onSelect={() => {
+                                                if (submitted || isRaceLocked) return;
+                                                setDnf(dnf === driver.name ? null : driver.name);
+                                            }}
                                         />
                                     ))}
                                 </div>
@@ -442,7 +446,10 @@ export default function RaceBetPage() {
                                         <motion.button
                                             key={team.shortName}
                                             whileTap={{ scale: 0.97 }}
-                                            onClick={() => setTeamMostPts(teamMostPts === team.shortName ? null : team.shortName)}
+                                            onClick={() => {
+                                                if (submitted || isRaceLocked) return;
+                                                setTeamMostPts(teamMostPts === team.shortName ? null : team.shortName);
+                                            }}
                                             className={`
                           flex items-center gap-3 p-3 rounded-lg border transition-all text-left w-full
                           ${teamMostPts === team.shortName
@@ -485,7 +492,10 @@ export default function RaceBetPage() {
                                                 key={driver.name}
                                                 driver={driver}
                                                 isSelected={specialBet === driver.name}
-                                                onSelect={() => setSpecialBet(specialBet === driver.name ? null : driver.name)}
+                                                onSelect={() => {
+                                                    if (submitted || isRaceLocked) return;
+                                                    setSpecialBet(specialBet === driver.name ? null : driver.name);
+                                                }}
                                             />
                                         ))}
                                     </div>
@@ -497,7 +507,10 @@ export default function RaceBetPage() {
                                             <motion.button
                                                 key={team.shortName}
                                                 whileTap={{ scale: 0.97 }}
-                                                onClick={() => setSpecialBet(specialBet === team.shortName ? null : team.shortName)}
+                                                onClick={() => {
+                                                    if (submitted || isRaceLocked) return;
+                                                    setSpecialBet(specialBet === team.shortName ? null : team.shortName);
+                                                }}
                                                 className={`
                                                         flex items-center gap-3 p-3 rounded-lg border transition-all text-left w-full
                                                         ${specialBet === team.shortName
@@ -524,7 +537,10 @@ export default function RaceBetPage() {
                                             <motion.button
                                                 key={opt}
                                                 whileTap={{ scale: 0.97 }}
-                                                onClick={() => setSpecialBet(specialBet === opt ? null : opt)}
+                                                onClick={() => {
+                                                    if (submitted || isRaceLocked) return;
+                                                    setSpecialBet(specialBet === opt ? null : opt);
+                                                }}
                                                 className={`
                                                         p-4 rounded-lg border transition-all font-semibold text-center
                                                         ${specialBet === opt
