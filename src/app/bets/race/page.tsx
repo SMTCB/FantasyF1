@@ -21,15 +21,21 @@ import Link from 'next/link';
 export default function RaceBetsIndexPage() {
     const nextRace = getNextRace();
     const [manualUnlocks, setManualUnlocks] = useState<Record<number, boolean>>({});
+    const [autoLocks, setAutoLocks] = useState<Record<number, boolean>>({});
     const supabase = createClient();
 
     useEffect(() => {
         const fetchUnlocks = async () => {
-            const { data } = await supabase.from('races').select('round, is_manual_unlock');
+            const { data } = await supabase.from('races').select('round, is_manual_unlock, session_start');
             if (data) {
                 const unlocks: Record<number, boolean> = {};
-                data.forEach(r => unlocks[r.round] = r.is_manual_unlock || false);
+                const autoL: Record<number, boolean> = {};
+                data.forEach(r => {
+                    unlocks[r.round] = r.is_manual_unlock || false;
+                    autoL[r.round] = r.session_start ? isBetLocked(r.session_start) : false;
+                });
                 setManualUnlocks(unlocks);
+                setAutoLocks(autoL);
             }
         };
         fetchUnlocks();
@@ -61,9 +67,12 @@ export default function RaceBetsIndexPage() {
                 {CALENDAR.map((race) => {
                     const isPast = nextRace && race.round < nextRace.round;
                     const isNext = nextRace && race.round === nextRace.round;
-                    const isLocked = isPast && !manualUnlocks[race.round];
-                    const isPending = !isPast && !isNext && !manualUnlocks[race.round];
-                    const isActive = isNext || manualUnlocks[race.round];
+                    const isFuture = nextRace ? race.round > nextRace.round : false;
+
+                    const isNaturallyLocked = isPast || (isNext && autoLocks[race.round]);
+                    const isLocked = isNaturallyLocked && !manualUnlocks[race.round];
+                    const isPending = isFuture && !manualUnlocks[race.round];
+                    const isActive = manualUnlocks[race.round] || (isNext && !autoLocks[race.round]);
 
                     return (
                         <Link
