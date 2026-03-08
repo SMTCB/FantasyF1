@@ -75,24 +75,52 @@ export default function AdminPage() {
                 setIsAuthorized(false);
             }
 
-            // Year lock
+            // Year lock and initial data hydrate
             const { data: yearData } = await supabase
                 .from('year_results')
-                .select('is_bets_locked')
+                .select('*')
                 .eq('season', 2026)
-                .single();
+                .maybeSingle();
 
-            if (yearData) setIsYearLocked(yearData.is_bets_locked);
+            if (yearData) {
+                setIsYearLocked(yearData.is_bets_locked);
+                setYearResultsForm({
+                    driverChampion: yearData.driver_champion || '',
+                    driverP2: yearData.driver_p2 || '',
+                    driverP3: yearData.driver_p3 || '',
+                    constructorChampion: yearData.constructor_champion || '',
+                    lastConstructor: yearData.last_constructor || '',
+                    fewestFinishersRace: yearData.fewest_finishers_race || '',
+                    mostDnfsDriver: yearData.most_dnfs_driver || '',
+                    firstDriverReplaced: yearData.first_driver_replaced || '',
+                    mostPoles: yearData.most_poles || '',
+                    mostPodiumsNoWin: yearData.most_podiums_no_win || '',
+                });
+            }
 
-            // Manual unlocks
+            // Manual unlocks and initial race data hydrate
             const { data: raceData } = await supabase
                 .from('races')
-                .select('round, is_manual_unlock');
+                .select('round, is_manual_unlock, result_p1, result_p2, result_p3, result_dnf_drivers, result_team_most_points, special_category_answer');
 
             if (raceData) {
                 const unlocks: Record<number, boolean> = {};
-                raceData.forEach(r => unlocks[r.round] = r.is_manual_unlock || false);
+                const initialFormState: Record<number, any> = {};
+
+                raceData.forEach(r => {
+                    unlocks[r.round] = r.is_manual_unlock || false;
+                    initialFormState[r.round] = {
+                        p1: r.result_p1 || '',
+                        p2: r.result_p2 || '',
+                        p3: r.result_p3 || '',
+                        dnf: r.result_dnf_drivers || [],
+                        teamMostPts: r.result_team_most_points || '',
+                        special: r.special_category_answer || ''
+                    };
+                });
+
                 setManualUnlocks(unlocks);
+                setResultsForm(initialFormState);
             }
         };
         fetchData();
