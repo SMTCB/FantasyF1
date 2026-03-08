@@ -100,3 +100,18 @@ export async function fetchDrivers(sessionKey: number) {
         return [];
     }
 }
+/**
+ * Fetch official session classification (final positions, DNF status, etc.)
+ */
+export async function fetchSessionResult(sessionKey: number) {
+    try {
+        const res = await fetch(
+            `${OPENF1_BASE}/session_result?session_key=${sessionKey}`,
+            { next: { revalidate: 60 } }
+        );
+        if (!res.ok) return [];
+        return res.json();
+    } catch {
+        return [];
+    }
+}

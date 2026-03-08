@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { CALENDAR, ALL_DRIVERS, TEAMS, YEAR_BET_SCORING, ROUND_TO_COUNTRY } from '@/lib/f1-data';
-import { fetchRaceSession, fetchRaceResults, fetchDrivers } from '@/lib/openf1';
+import { fetchRaceSession, fetchSessionResult, fetchDrivers } from '@/lib/openf1';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useCallback } from 'react';
 import { scoreRaceBet, scoreYearBet, type RaceBet, type RaceResult, type YearBet, type YearResult } from '@/lib/scoring';
@@ -367,26 +367,17 @@ export default function AdminPage() {
         try {
             const session = await fetchRaceSession(year, country);
             if (session) {
-                const [positions, driverInfo] = await Promise.all([
-                    fetchRaceResults(session.session_key),
+                const [classification, driverInfo] = await Promise.all([
+                    fetchSessionResult(session.session_key),
                     fetchDrivers(session.session_key)
                 ]);
 
-                if (!positions || positions.length === 0) {
-                    alert("Race in progress or results not yet available.");
+                if (!classification || classification.length === 0) {
+                    alert("Official race results (classification) not yet available on OpenF1.");
                     return;
                 }
 
-                const latestPositions = new Map();
-                positions.forEach((p: any) => {
-                    const current = latestPositions.get(p.driver_number);
-                    if (!current || new Date(p.date) > new Date(current.date)) {
-                        latestPositions.set(p.driver_number, p);
-                    }
-                });
-
-                const sortedDrivers = Array.from(latestPositions.values()).sort((a, b) => a.position - b.position);
-
+                // Map driver number to our system driver
                 const getOurDriver = (driverNum: number) => {
                     const dInfo = driverInfo.find((d: any) => d.driver_number === driverNum);
                     if (!dInfo) return undefined;
@@ -400,22 +391,28 @@ export default function AdminPage() {
 
                 const getOurDriverName = (driverNum: number) => getOurDriver(driverNum)?.name;
 
-                // 1. Podiums
-                const p1 = getOurDriverName(sortedDrivers[0]?.driver_number);
-                const p2 = getOurDriverName(sortedDrivers[1]?.driver_number);
-                const p3 = getOurDriverName(sortedDrivers[2]?.driver_number);
+                // 1. Podiums - Sort by position just in case
+                const sortedResults = [...classification].sort((a: any, b: any) => a.position - b.position);
+
+                const p1 = getOurDriverName(sortedResults.find((r: any) => r.position === 1)?.driver_number);
+                const p2 = getOurDriverName(sortedResults.find((r: any) => r.position === 2)?.driver_number);
+                const p3 = getOurDriverName(sortedResults.find((r: any) => r.position === 3)?.driver_number);
 
                 if (p1) handleFormChange(round, 'p1', p1);
                 if (p2) handleFormChange(round, 'p2', p2);
                 if (p3) handleFormChange(round, 'p3', p3);
 
                 // 2. Team Most Points Calculation
+                // Official F1 points for top 10
                 const f1Points = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
                 const teamScores: Record<string, number> = {};
-                sortedDrivers.slice(0, 10).forEach((pos, idx) => {
-                    const driver = getOurDriver(pos.driver_number);
-                    if (driver) {
-                        teamScores[driver.team] = (teamScores[driver.team] || 0) + f1Points[idx];
+
+                sortedResults.forEach((res: any) => {
+                    if (res.position >= 1 && res.position <= 10) {
+                        const driver = getOurDriver(res.driver_number);
+                        if (driver) {
+                            teamScores[driver.team] = (teamScores[driver.team] || 0) + f1Points[res.position - 1];
+                        }
                     }
                 });
 
@@ -430,20 +427,15 @@ export default function AdminPage() {
                 if (bestTeam) handleFormChange(round, 'teamMostPts', bestTeam);
 
                 // 3. DNF Detection
-                // Logic: Any driver who was active but whose last position update is > 3 mins before the session's last update
-                const maxDate = Math.max(...positions.map((p: any) => new Date(p.date).getTime()));
-                const dnfDrivers = driverInfo
-                    .filter((di: any) => {
-                        const lastPos = latestPositions.get(di.driver_number);
-                        // Significant gap (3+ mins) suggests retirement before race checkered flag
-                        return lastPos && (maxDate - new Date(lastPos.date).getTime() > 180000);
-                    })
-                    .map((di: any) => getOurDriverName(di.driver_number))
+                // Using official 'dnf' flag from session_result
+                const dnfDrivers = classification
+                    .filter((res: any) => res.dnf === true)
+                    .map((res: any) => getOurDriverName(res.driver_number))
                     .filter(Boolean) as string[];
 
                 handleDnfChange(round, dnfDrivers);
 
-                handleSave(`R${round} API synced successfully`);
+                handleSave(`R${round} API synced successfully (Official Classification)`);
             } else {
                 alert("Race session not found on OpenF1 API yet.");
             }
