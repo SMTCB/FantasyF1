@@ -114,6 +114,16 @@ export const CALENDAR: Race[] = [
     { round: 24, gp: "Abu Dhabi GP", date: "2026-12-06", circuit: "Yas Marina", isSaturday: false, specialCategory: shuffledCategories[23] },
 ];
 
+
+export const ROUND_TO_COUNTRY: Record<number, string> = {
+    1: 'Australia', 2: 'China', 3: 'Japan', 4: 'Bahrain',
+    5: 'Saudi Arabia', 6: 'United States', 7: 'Canada', 8: 'Monaco',
+    9: 'Spain', 10: 'Austria', 11: 'Great Britain', 12: 'Belgium',
+    13: 'Hungary', 14: 'Netherlands', 15: 'Italy', 16: 'Spain',
+    17: 'Azerbaijan', 18: 'Singapore', 19: 'United States', 20: 'Mexico',
+    21: 'Brazil', 22: 'United States', 23: 'Qatar', 24: 'United Arab Emirates',
+};
+
 // Flatten all drivers with their team info
 export const ALL_DRIVERS: Driver[] = TEAMS.flatMap(team =>
     team.drivers.map(d => ({
@@ -123,6 +133,7 @@ export const ALL_DRIVERS: Driver[] = TEAMS.flatMap(team =>
         teamCssClass: team.cssClass,
     }))
 );
+
 
 // Get team slug for CSS from team name
 export function getTeamCssClass(teamName: string): string {

@@ -18,13 +18,29 @@ export interface SessionInfo {
 
 /**
  * Fetch the Race session for a given meeting (round).
- * OpenF1 provides session_type = "Race"
  */
 export async function fetchRaceSession(year: number, countryName: string): Promise<SessionInfo | null> {
     try {
         const res = await fetch(
             `${OPENF1_BASE}/sessions?year=${year}&country_name=${encodeURIComponent(countryName)}&session_type=Race`,
-            { next: { revalidate: 300 } } // cache for 5 min
+            { next: { revalidate: 300 } }
+        );
+        if (!res.ok) return null;
+        const data: SessionInfo[] = await res.json();
+        return data[0] || null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Fetch the Qualifying session for a given meeting (round).
+ */
+export async function fetchQualifyingSession(year: number, countryName: string): Promise<SessionInfo | null> {
+    try {
+        const res = await fetch(
+            `${OPENF1_BASE}/sessions?year=${year}&country_name=${encodeURIComponent(countryName)}&session_type=Qualifying`,
+            { next: { revalidate: 300 } }
         );
         if (!res.ok) return null;
         const data: SessionInfo[] = await res.json();

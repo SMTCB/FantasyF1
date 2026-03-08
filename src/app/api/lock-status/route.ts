@@ -1,18 +1,8 @@
 // API route for checking bet lock status
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchRaceSession, isBetLocked, getLockTime } from '@/lib/openf1';
-import { CALENDAR } from '@/lib/f1-data';
+import { CALENDAR, ROUND_TO_COUNTRY } from '@/lib/f1-data';
 import { createClient } from '@/lib/supabase/server';
-
-// Country name mapping for OpenF1 API
-const ROUND_TO_COUNTRY: Record<number, string> = {
-    1: 'Australia', 2: 'China', 3: 'Japan', 4: 'Bahrain',
-    5: 'Saudi Arabia', 6: 'United States', 7: 'Canada', 8: 'Monaco',
-    9: 'Spain', 10: 'Austria', 11: 'Great Britain', 12: 'Belgium',
-    13: 'Hungary', 14: 'Netherlands', 15: 'Italy', 16: 'Spain',
-    17: 'Azerbaijan', 18: 'Singapore', 19: 'United States', 20: 'Mexico',
-    21: 'Brazil', 22: 'United States', 23: 'Qatar', 24: 'United Arab Emirates',
-};
 
 export async function GET(request: NextRequest) {
     const supabase = await createClient();

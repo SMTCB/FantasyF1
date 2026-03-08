@@ -16,6 +16,9 @@ import {
     Zap,
     AlertTriangle,
     Users,
+    List,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { getRaceByRound, ALL_DRIVERS, TEAMS, RACE_BET_SCORING, getNextRace } from '@/lib/f1-data';
@@ -81,7 +84,11 @@ export default function RaceBetPage() {
     const [isLockForced, setIsLockForced] = useState(false);
     const [isRaceLocked, setIsRaceLocked] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [qualifyingResults, setQualifyingResults] = useState<any[]>([]);
+    const [showQualifying, setShowQualifying] = useState(false);
+    const [loadingQualy, setLoadingQualy] = useState(false);
     const supabase = createClient();
+
 
     useEffect(() => {
         const fetchBetData = async () => {
@@ -131,7 +138,28 @@ export default function RaceBetPage() {
             setLoading(false);
         };
         fetchBetData();
-    }, [round, supabase]);
+    }, [round, supabase, race]);
+
+    useEffect(() => {
+        if (!race) return;
+
+        const fetchQualy = async () => {
+            setLoadingQualy(true);
+            try {
+                const res = await fetch(`/api/qualifying-results?round=${round}`);
+                const data = await res.json();
+                if (data.results) {
+                    setQualifyingResults(data.results);
+                }
+            } catch (err) {
+                console.error('Qualy fetch error:', err);
+            } finally {
+                setLoadingQualy(false);
+            }
+        };
+
+        fetchQualy();
+    }, [round, race]);
 
     if (!race) {
         return (
@@ -284,6 +312,56 @@ export default function RaceBetPage() {
                                     🎯 All 3 correct = <strong>+{RACE_BET_SCORING.ALL_PODIUM_BONUS}pts bonus!</strong>
                                 </div>
                             )}
+
+                            {/* Qualifying Results Section */}
+                            <div className="mb-4">
+                                <button
+                                    onClick={() => setShowQualifying(!showQualifying)}
+                                    className="flex items-center gap-2 w-full p-2 bg-[var(--color-carbon-800)]/50 border border-[var(--color-carbon-700)] rounded-lg text-xs font-medium hover:border-[var(--color-carbon-500)] transition-all"
+                                >
+                                    <List size={14} className="text-[var(--color-f1-red)]" />
+                                    <span>QUALIFYING GRID</span>
+                                    {loadingQualy ? (
+                                        <div className="ml-auto w-3 h-3 border-2 border-[var(--color-f1-red)]/30 border-t-[var(--color-f1-red)] rounded-full animate-spin" />
+                                    ) : (
+                                        <div className="ml-auto flex items-center gap-1 text-[9px] text-[var(--color-carbon-400)]">
+                                            {showQualifying ? <EyeOff size={12} /> : <Eye size={12} />}
+                                            {showQualifying ? 'HIDE' : 'SHOW'}
+                                        </div>
+                                    )}
+                                </button>
+
+                                <AnimatePresence>
+                                    {showQualifying && (
+                                        <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: 'auto', opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            className="overflow-hidden"
+                                        >
+                                            <div className="mt-2 p-3 bg-[var(--color-carbon-900)]/80 border border-[var(--color-carbon-700)] rounded-lg">
+                                                {qualifyingResults.length > 0 ? (
+                                                    <div className="space-y-1.5 max-h-[180px] overflow-y-auto pr-1 custom-scrollbar">
+                                                        {qualifyingResults.map((res: any) => (
+                                                            <div key={res.driverNumber} className="flex items-center gap-3 text-[10px] py-1 border-b border-white/5 last:border-0">
+                                                                <span className={`w-4 font-mono font-bold ${res.position <= 3 ? 'text-[var(--color-f1-red)]' : 'text-[var(--color-carbon-400)]'}`}>
+                                                                    {res.position}
+                                                                </span>
+                                                                <span className="flex-1 font-medium">{res.driverName}</span>
+                                                                <span className="text-[9px] text-[var(--color-carbon-500)] uppercase font-mono">{res.teamName}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-center py-4 text-[10px] text-[var(--color-carbon-500)] font-mono italic">
+                                                        {loadingQualy ? 'SYNCING LIVE TELEMETRY...' : 'QUALIFYING RESULTS NOT YET AVAILABLE'}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
 
                             <div className="relative mb-3">
                                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-carbon-400)]" />
