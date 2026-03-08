@@ -324,7 +324,7 @@ export default function BetsReportPage() {
                                         <div className="grid grid-cols-1 gap-2 border-t border-[var(--color-carbon-800)] pt-3">
                                             <div className="flex items-center justify-between text-xs">
                                                 <span className="text-[var(--color-carbon-400)] flex items-center gap-1.5">
-                                                    <AlertTriangle size={12} /> DNF
+                                                    <AlertTriangle size={12} /> DNF Driver
                                                 </span>
                                                 <div className="flex items-center gap-2">
                                                     <span className={`font-semibold text-right max-w-[130px] truncate ${getPointsColor(scoreEntry?.dnf_pts)}`}>{bet.dnf_driver || '—'}</span>

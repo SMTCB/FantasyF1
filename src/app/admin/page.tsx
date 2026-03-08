@@ -22,7 +22,7 @@ import {
     Users,
 } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
-import { CALENDAR, ALL_DRIVERS, TEAMS, YEAR_BET_SCORING } from '@/lib/f1-data';
+import { CALENDAR, ALL_DRIVERS, TEAMS, YEAR_BET_SCORING, ROUND_TO_COUNTRY } from '@/lib/f1-data';
 import { fetchRaceSession, fetchRaceResults } from '@/lib/openf1';
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useCallback } from 'react';
@@ -41,7 +41,7 @@ export default function AdminPage() {
 
     // Results Form State
     const [resultsForm, setResultsForm] = useState<Record<number, {
-        p1?: string; p2?: string; p3?: string; dnf?: string; teamMostPts?: string; special?: string;
+        p1?: string; p2?: string; p3?: string; dnf?: string[]; teamMostPts?: string; special?: string;
     }>>({});
     const [isFetchingApi, setIsFetchingApi] = useState<number | null>(null);
     const [isYearLocked, setIsYearLocked] = useState(false);
@@ -176,6 +176,16 @@ export default function AdminPage() {
         }));
     };
 
+    const handleDnfChange = (round: number, drivers: string[]) => {
+        setResultsForm(prev => ({
+            ...prev,
+            [round]: {
+                ...(prev[round] || {}),
+                dnf: drivers
+            }
+        }));
+    };
+
     const handleYearFormChange = (field: keyof YearResult, value: string) => {
         setYearResultsForm(prev => ({ ...prev, [field]: value }));
     };
@@ -197,7 +207,7 @@ export default function AdminPage() {
                     result_p1: form.p1,
                     result_p2: form.p2,
                     result_p3: form.p3,
-                    result_dnf_drivers: form.dnf ? [form.dnf] : [],
+                    result_dnf_drivers: form.dnf || [],
                     result_team_most_points: form.teamMostPts,
                     special_category_answer: form.special,
                     is_scored: true
@@ -214,12 +224,11 @@ export default function AdminPage() {
 
             if (betsError) throw betsError;
 
-            // 3. Prepare result for scoring engine
             const raceResult: RaceResult = {
                 p1: form.p1,
                 p2: form.p2,
                 p3: form.p3,
-                dnfDrivers: form.dnf ? [form.dnf] : [],
+                dnfDrivers: form.dnf || [],
                 teamMostPoints: form.teamMostPts || '',
                 specialCategoryAnswer: form.special || null
             };
@@ -524,7 +533,7 @@ export default function AdminPage() {
 
                                                     <div className="flex gap-2">
                                                         <button
-                                                            onClick={() => handleFetchApi(race.round, race.gp.replace(/ GP.*/, ''), 2026)}
+                                                            onClick={() => handleFetchApi(race.round, ROUND_TO_COUNTRY[race.round], 2026)}
                                                             disabled={isFetchingApi === race.round}
                                                             className="btn-secondary flex-1 text-xs py-2 flex items-center justify-center gap-1.5"
                                                         >
@@ -544,14 +553,14 @@ export default function AdminPage() {
                                                         </button>
                                                     </div>
 
-                                                    {/* P1, P2, P3, DNF (Drivers) */}
-                                                    {['p1', 'p2', 'p3', 'dnf'].map((field) => (
+                                                    {/* P1, P2, P3 (Drivers) */}
+                                                    {['p1', 'p2', 'p3'].map((field) => (
                                                         <div key={field}>
                                                             <label className="data-readout text-[9px] block mb-1">
-                                                                {field === 'dnf' ? 'First DNF / DNF Driver' : field.toUpperCase()}
+                                                                {field.toUpperCase()}
                                                             </label>
                                                             <select
-                                                                value={resultsForm[race.round]?.[field as keyof typeof resultsForm[number]] || ''}
+                                                                value={resultsForm[race.round]?.[field as keyof typeof resultsForm[number]] as string || ''}
                                                                 onChange={(e) => handleFormChange(race.round, field, e.target.value)}
                                                                 className="input-field text-sm"
                                                             >
@@ -562,6 +571,27 @@ export default function AdminPage() {
                                                             </select>
                                                         </div>
                                                     ))}
+
+                                                    {/* DNF Drivers */}
+                                                    <div>
+                                                        <label className="data-readout text-[9px] block mb-1">
+                                                            DNF DRIVERS (Hold Ctrl/Cmd to select multiple)
+                                                        </label>
+                                                        <select
+                                                            multiple
+                                                            size={5}
+                                                            value={resultsForm[race.round]?.dnf || []}
+                                                            onChange={(e) => {
+                                                                const selected = Array.from(e.target.selectedOptions, option => option.value);
+                                                                handleDnfChange(race.round, selected);
+                                                            }}
+                                                            className="input-field text-sm"
+                                                        >
+                                                            {ALL_DRIVERS.map(d => (
+                                                                <option key={d.name} value={d.name}>{d.name} ({d.team})</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
 
                                                     {/* Team Most Points */}
                                                     <div>

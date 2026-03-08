@@ -416,7 +416,7 @@ export default function RaceBetPage() {
                             <div>
                                 <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
                                     <AlertTriangle size={14} className="text-[var(--color-warning)]" />
-                                    DNF Prediction
+                                    DNF Driver
                                     <span className="score-pill text-[9px] ml-auto">{RACE_BET_SCORING.DNF}pts</span>
                                 </h3>
                                 <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto">
