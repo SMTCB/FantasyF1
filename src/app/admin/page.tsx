@@ -387,18 +387,20 @@ export default function AdminPage() {
 
                 const sortedDrivers = Array.from(latestPositions.values()).sort((a, b) => a.position - b.position);
 
-                const getOurDriverName = (driverNum: number) => {
+                const getOurDriver = (driverNum: number) => {
                     const dInfo = driverInfo.find((d: any) => d.driver_number === driverNum);
                     if (!dInfo) return undefined;
                     const lastName = (dInfo.name_acronym || dInfo.broadcast_name?.split(' ').pop() || '').toLowerCase();
                     const fallbackLastName = dInfo.full_name?.split(' ').pop()?.toLowerCase() || 'xxx';
-                    const found = ALL_DRIVERS.find(d => {
+                    return ALL_DRIVERS.find(d => {
                         const ourNormalized = d.name.toLowerCase();
                         return ourNormalized.includes(lastName) || ourNormalized.includes(fallbackLastName);
                     });
-                    return found?.name;
                 };
 
+                const getOurDriverName = (driverNum: number) => getOurDriver(driverNum)?.name;
+
+                // 1. Podiums
                 const p1 = getOurDriverName(sortedDrivers[0]?.driver_number);
                 const p2 = getOurDriverName(sortedDrivers[1]?.driver_number);
                 const p3 = getOurDriverName(sortedDrivers[2]?.driver_number);
@@ -406,6 +408,40 @@ export default function AdminPage() {
                 if (p1) handleFormChange(round, 'p1', p1);
                 if (p2) handleFormChange(round, 'p2', p2);
                 if (p3) handleFormChange(round, 'p3', p3);
+
+                // 2. Team Most Points Calculation
+                const f1Points = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+                const teamScores: Record<string, number> = {};
+                sortedDrivers.slice(0, 10).forEach((pos, idx) => {
+                    const driver = getOurDriver(pos.driver_number);
+                    if (driver) {
+                        teamScores[driver.team] = (teamScores[driver.team] || 0) + f1Points[idx];
+                    }
+                });
+
+                let bestTeam = '';
+                let maxPts = -1;
+                Object.entries(teamScores).forEach(([team, pts]) => {
+                    if (pts > maxPts) {
+                        maxPts = pts;
+                        bestTeam = team;
+                    }
+                });
+                if (bestTeam) handleFormChange(round, 'teamMostPts', bestTeam);
+
+                // 3. DNF Detection
+                // Logic: Any driver who was active but whose last position update is > 3 mins before the session's last update
+                const maxDate = Math.max(...positions.map((p: any) => new Date(p.date).getTime()));
+                const dnfDrivers = driverInfo
+                    .filter((di: any) => {
+                        const lastPos = latestPositions.get(di.driver_number);
+                        // Significant gap (3+ mins) suggests retirement before race checkered flag
+                        return lastPos && (maxDate - new Date(lastPos.date).getTime() > 180000);
+                    })
+                    .map((di: any) => getOurDriverName(di.driver_number))
+                    .filter(Boolean) as string[];
+
+                handleDnfChange(round, dnfDrivers);
 
                 handleSave(`R${round} API synced successfully`);
             } else {
