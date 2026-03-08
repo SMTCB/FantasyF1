@@ -306,6 +306,10 @@ export default function AdminPage() {
             });
 
             await Promise.all(scorePromises);
+
+            // 5. Automatically re-calculate preliminary year scores
+            await handleCalculateYearScores(false);
+
             handleSave(`Race ${round} results & scores`);
         } catch (e: any) {
             console.error(e);
@@ -313,22 +317,24 @@ export default function AdminPage() {
         }
     };
 
-    const handleCalculateYearScores = async () => {
-        // Basic validation
-        const requiredFields: (keyof YearResult)[] = [
-            'driverChampion', 'driverP2', 'driverP3', 'constructorChampion',
-            'lastConstructor', 'fewestFinishersRace', 'mostDnfsDriver',
-            'firstDriverReplaced', 'mostPoles', 'mostPodiumsNoWin'
-        ];
+    const handleCalculateYearScores = async (isFinal: boolean = true) => {
+        // Basic validation ONLY if this is the final calculation
+        if (isFinal) {
+            const requiredFields: (keyof YearResult)[] = [
+                'driverChampion', 'driverP2', 'driverP3', 'constructorChampion',
+                'lastConstructor', 'fewestFinishersRace', 'mostDnfsDriver',
+                'firstDriverReplaced', 'mostPoles', 'mostPodiumsNoWin'
+            ];
 
-        for (const field of requiredFields) {
-            if (!yearResultsForm[field]) {
-                alert(`Missing field: ${field}`);
-                return;
+            for (const field of requiredFields) {
+                if (!yearResultsForm[field]) {
+                    alert(`Missing field: ${field}`);
+                    return;
+                }
             }
         }
 
-        setSaveStatus("Year-end Scoring...");
+        setSaveStatus(isFinal ? "Year-end Scoring..." : "Preliminary Year Scoring...");
 
         try {
             // 1. Save year results
@@ -346,7 +352,7 @@ export default function AdminPage() {
                     first_driver_replaced: yearResultsForm.firstDriverReplaced,
                     most_poles: yearResultsForm.mostPoles,
                     most_podiums_no_win: yearResultsForm.mostPodiumsNoWin,
-                    is_final: true
+                    is_final: isFinal
                 }, { onConflict: 'season' });
 
             if (yearError) throw yearError;
@@ -483,6 +489,24 @@ export default function AdminPage() {
                     .filter(Boolean) as string[];
 
                 handleDnfChange(round, dnfDrivers);
+
+                // 4. Compute Year Stats
+                const stats = computeYearStats(raceSeasonResults, qualSeasonResults, driverInfo, champDrivers, champTeams);
+                setPrelimYearStats(stats);
+                setPrelimRound(round);
+
+                // Update year results form with these API computed values!
+                setYearResultsForm(prev => ({
+                    ...prev,
+                    driverChampion: stats.driverChampion || prev.driverChampion,
+                    driverP2: stats.driverP2 || prev.driverP2,
+                    driverP3: stats.driverP3 || prev.driverP3,
+                    constructorChampion: stats.constructorChampion || prev.constructorChampion,
+                    lastConstructor: stats.lastConstructor || prev.lastConstructor,
+                    mostDnfsDriver: stats.mostDnfsDriver || prev.mostDnfsDriver,
+                    mostPoles: stats.mostPoles || prev.mostPoles,
+                    mostPodiumsNoWin: stats.mostPodiumsNoWin || prev.mostPodiumsNoWin
+                }));
 
                 handleSave(`R${round} API synced successfully (Official Classification)`);
             } else {
@@ -990,7 +1014,7 @@ export default function AdminPage() {
                             </div>
 
                             <button
-                                onClick={handleCalculateYearScores}
+                                onClick={() => handleCalculateYearScores(true)}
                                 className="btn-primary w-full py-3 text-sm flex items-center justify-center gap-2"
                             >
                                 <Zap size={14} />
