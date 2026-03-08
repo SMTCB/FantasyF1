@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchRaceSession, isBetLocked, getLockTime } from '@/lib/openf1';
 import { CALENDAR } from '@/lib/f1-data';
+import { createClient } from '@/lib/supabase/server';
 
 // Country name mapping for OpenF1 API
 const ROUND_TO_COUNTRY: Record<number, string> = {
@@ -14,6 +15,7 @@ const ROUND_TO_COUNTRY: Record<number, string> = {
 };
 
 export async function GET(request: NextRequest) {
+    const supabase = await createClient();
     const { searchParams } = new URL(request.url);
     const round = Number(searchParams.get('round'));
 
@@ -28,21 +30,35 @@ export async function GET(request: NextRequest) {
 
     const country = ROUND_TO_COUNTRY[round];
 
-    // Try to fetch actual session data from OpenF1
-    const session = await fetchRaceSession(2026, country);
+    // 1. First, check our internal DB record (where sync_race_times.js populated data)
+    const { data: dbRace } = await supabase
+        .from('races')
+        .select('session_start')
+        .eq('round', round)
+        .single();
 
-    if (session) {
-        const locked = isBetLocked(session.date_start);
-        const lockTime = getLockTime(session.date_start);
+    let sessionStart = dbRace?.session_start;
+
+    // 2. Fallback to OpenF1 API directly if DB is missing time
+    if (!sessionStart) {
+        const session = await fetchRaceSession(2026, country);
+        if (session) {
+            sessionStart = session.date_start;
+        }
+    }
+
+    if (sessionStart) {
+        const locked = isBetLocked(sessionStart);
+        const lockTime = getLockTime(sessionStart);
 
         return NextResponse.json({
             round,
             gp: race.gp,
             locked,
             lockTime: lockTime.toISOString(),
-            sessionStart: session.date_start,
+            sessionStart: sessionStart,
             isSaturday: race.isSaturday,
-            source: 'openf1',
+            source: dbRace?.session_start ? 'database' : 'openf1',
         });
     }
 

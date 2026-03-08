@@ -138,14 +138,24 @@ export function getRaceByRound(round: number): Race | undefined {
     return CALENDAR.find(r => r.round === round);
 }
 
+export function isPastRace(race: Race): boolean {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const raceDate = new Date(race.date);
+    raceDate.setHours(0, 0, 0, 0);
+
+    // It's past if the race day is strictly before today
+    return raceDate < today;
+}
+
 export function getNextRace(): Race | undefined {
-    // Current date set to start of day for comparison
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     return CALENDAR.find(r => {
         const raceDate = new Date(r.date);
         raceDate.setHours(0, 0, 0, 0);
+        // It's the "next" race if it's today or in the future
         return raceDate >= today;
     });
 }

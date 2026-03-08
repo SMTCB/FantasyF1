@@ -2,11 +2,15 @@
 
 import { motion } from 'framer-motion';
 import { Flag, Timer, MapPin } from 'lucide-react';
-import { getNextRace, CALENDAR } from '@/lib/f1-data';
+import { getNextRace, CALENDAR, isPastRace } from '@/lib/f1-data';
 import { useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
-function getCountdown(targetDate: string) {
-    const target = new Date(targetDate + 'T14:00:00Z'); // assume 14:00 UTC race start
+function getCountdown(sessionStart: string | null, fallbackDate: string) {
+    // If we have a real session start (with time), use it. 
+    // Otherwise fallback to 14:00 UTC on the race date
+    const targetTime = sessionStart || (fallbackDate + 'T14:00:00Z');
+    const target = new Date(targetTime);
     const now = new Date();
     const diff = target.getTime() - now.getTime();
 
@@ -22,19 +26,36 @@ function getCountdown(targetDate: string) {
 
 export default function NextRaceHero() {
     const nextRace = getNextRace();
-    const [countdown, setCountdown] = useState(getCountdown(nextRace?.date ?? ''));
+    const [actualStartTime, setActualStartTime] = useState<string | null>(null);
+    const [countdown, setCountdown] = useState(getCountdown(null, nextRace?.date ?? ''));
+    const supabase = createClient();
 
     useEffect(() => {
         if (!nextRace) return;
+
+        const fetchSessionTime = async () => {
+            const { data } = await supabase
+                .from('races')
+                .select('session_start')
+                .eq('round', nextRace.round)
+                .single();
+
+            if (data?.session_start) {
+                setActualStartTime(data.session_start);
+            }
+        };
+
+        fetchSessionTime();
+
         const interval = setInterval(() => {
-            setCountdown(getCountdown(nextRace.date));
+            setCountdown(getCountdown(actualStartTime, nextRace.date));
         }, 1000);
         return () => clearInterval(interval);
-    }, [nextRace]);
+    }, [nextRace, actualStartTime, supabase]);
 
     if (!nextRace) return null;
 
-    const completedRaces = CALENDAR.filter(r => new Date(r.date) < new Date()).length;
+    const completedRaces = CALENDAR.filter(r => isPastRace(r)).length;
     const totalRaces = CALENDAR.length;
 
     return (

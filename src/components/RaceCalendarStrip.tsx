@@ -1,13 +1,12 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { CALENDAR, type Race } from '@/lib/f1-data';
+import { CALENDAR, type Race, getNextRace, isPastRace } from '@/lib/f1-data';
 import { Flag, MapPin, Calendar, ChevronRight, Lock, Unlock } from 'lucide-react';
 import Link from 'next/link';
 
 export default function RaceCalendarStrip() {
-    const now = new Date();
-    const nextRaceIdx = CALENDAR.findIndex(r => new Date(r.date) >= now);
+    const nextRace = getNextRace();
 
     return (
         <div className="mb-6">
@@ -20,8 +19,8 @@ export default function RaceCalendarStrip() {
 
             <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-hide" style={{ scrollbarWidth: 'none' }}>
                 {CALENDAR.map((race, idx) => {
-                    const isPast = new Date(race.date) < now;
-                    const isNext = idx === nextRaceIdx;
+                    const isPast = isPastRace(race);
+                    const isNext = nextRace?.round === race.round;
                     const raceDate = new Date(race.date);
 
                     return (
