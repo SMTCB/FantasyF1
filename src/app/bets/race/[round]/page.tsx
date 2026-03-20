@@ -87,6 +87,9 @@ export default function RaceBetPage() {
     const [qualifyingResults, setQualifyingResults] = useState<any[]>([]);
     const [showQualifying, setShowQualifying] = useState(false);
     const [loadingQualy, setLoadingQualy] = useState(false);
+    const [raceResults, setRaceResults] = useState<any[]>([]);
+    const [showRaceResults, setShowRaceResults] = useState(false);
+    const [loadingRaceResults, setLoadingRaceResults] = useState(false);
     const supabase = createClient();
 
 
@@ -159,6 +162,27 @@ export default function RaceBetPage() {
         };
 
         fetchQualy();
+    }, [round, race]);
+
+    useEffect(() => {
+        if (!race) return;
+
+        const fetchRaceRes = async () => {
+            setLoadingRaceResults(true);
+            try {
+                const res = await fetch(`/api/race-results?round=${round}`);
+                const data = await res.json();
+                if (data.results) {
+                    setRaceResults(data.results);
+                }
+            } catch (err) {
+                console.error('Race results fetch error:', err);
+            } finally {
+                setLoadingRaceResults(false);
+            }
+        };
+
+        fetchRaceRes();
     }, [round, race]);
 
     if (!race) {
@@ -355,6 +379,57 @@ export default function RaceBetPage() {
                                                 ) : (
                                                     <div className="text-center py-4 text-[10px] text-[var(--color-carbon-500)] font-mono italic">
                                                         {loadingQualy ? 'SYNCING LIVE TELEMETRY...' : 'QUALIFYING RESULTS NOT YET AVAILABLE'}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+
+                            {/* Race Results Section */}
+                            <div className="mb-4">
+                                <button
+                                    onClick={() => setShowRaceResults(!showRaceResults)}
+                                    className="flex items-center gap-2 w-full p-2 bg-[var(--color-carbon-800)]/50 border border-[var(--color-carbon-700)] rounded-lg text-xs font-medium hover:border-[var(--color-carbon-500)] transition-all overflow-hidden"
+                                >
+                                    <Trophy size={14} className="text-[var(--color-success)] flex-shrink-0" />
+                                    <span className="truncate">PRELIMINARY CLASSIFICATION</span>
+                                    {loadingRaceResults ? (
+                                        <div className="ml-auto w-3 h-3 border-2 border-[var(--color-success)]/30 border-t-[var(--color-success)] rounded-full animate-spin flex-shrink-0" />
+                                    ) : (
+                                        <div className="ml-auto flex items-center gap-1 text-[9px] text-[var(--color-carbon-400)] flex-shrink-0">
+                                            {showRaceResults ? <EyeOff size={12} /> : <Eye size={12} />}
+                                            {showRaceResults ? 'HIDE' : 'SHOW'}
+                                        </div>
+                                    )}
+                                </button>
+
+                                <AnimatePresence>
+                                    {showRaceResults && (
+                                        <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: 'auto', opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            className="overflow-hidden"
+                                        >
+                                            <div className="mt-2 p-3 bg-[var(--color-carbon-900)]/80 border border-[var(--color-carbon-700)] rounded-lg">
+                                                {raceResults.length > 0 ? (
+                                                    <div className="space-y-1.5 max-h-[180px] overflow-y-auto pr-1 custom-scrollbar">
+                                                        {raceResults.map((res: any) => (
+                                                            <div key={res.driverNumber} className="flex items-center gap-3 text-[10px] py-1 border-b border-white/5 last:border-0">
+                                                                <span className={`w-4 font-mono font-bold ${res.position <= 3 ? 'text-[var(--color-success)]' : 'text-[var(--color-carbon-400)]'}`}>
+                                                                    {res.position}
+                                                                </span>
+                                                                <span className="flex-1 font-medium">{res.driverName}</span>
+                                                                <span className="text-[9px] text-[var(--color-carbon-500)] uppercase font-mono">{res.teamName}</span>
+                                                                {res.dnf && <span className="text-[8px] bg-red-900/40 text-red-400 px-1 rounded">DNF</span>}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-center py-4 text-[10px] text-[var(--color-carbon-500)] font-mono italic">
+                                                        {loadingRaceResults ? 'FETCHING LIVE DATA...' : 'OFFICIAL RESULTS NOT YET AVAILABLE'}
                                                     </div>
                                                 )}
                                             </div>

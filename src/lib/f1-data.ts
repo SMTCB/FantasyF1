@@ -149,11 +149,19 @@ export function getRaceByRound(round: number): Race | undefined {
     return CALENDAR.find(r => r.round === round);
 }
 
+/**
+ * Helper to parse YYYY-MM-DD date strings in a timezone-independent way
+ * (always as local midnight) to avoid UTC shifts.
+ */
+export function parseDateOnly(dateStr: string): Date {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+}
+
 export function isPastRace(race: Race): boolean {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const raceDate = new Date(race.date);
-    raceDate.setHours(0, 0, 0, 0);
+    const raceDate = parseDateOnly(race.date);
 
     // It's past if the race day is strictly before today
     return raceDate < today;
@@ -164,8 +172,7 @@ export function getNextRace(): Race | undefined {
     today.setHours(0, 0, 0, 0);
 
     return CALENDAR.find(r => {
-        const raceDate = new Date(r.date);
-        raceDate.setHours(0, 0, 0, 0);
+        const raceDate = parseDateOnly(r.date);
         // It's the "next" race if it's today or in the future
         return raceDate >= today;
     });
