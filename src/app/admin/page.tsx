@@ -410,22 +410,13 @@ export default function AdminPage() {
         try {
             const session = await fetchRaceSession(year, country);
             if (session) {
-                // Fetch race classification AND season-wide data in parallel
-                const [
-                    classification,
-                    driverInfo,
-                    raceSeasonResults,
-                    qualSeasonResults,
-                    champDrivers,
-                    champTeams,
-                ] = await Promise.all([
-                    fetchSessionResult(session.session_key),
-                    fetchDrivers(session.session_key),
-                    fetchAllSeasonResults(year, 'Race'),
-                    fetchAllSeasonResults(year, 'Qualifying'),
-                    fetchChampionshipDrivers(year),
-                    fetchChampionshipTeams(year),
-                ]);
+                // Fetch race classification AND season-wide data sequentially to avoid OpenF1 rate limits (429)
+                const classification = await fetchSessionResult(session.session_key);
+                const driverInfo = await fetchDrivers(session.session_key);
+                const raceSeasonResults = await fetchAllSeasonResults(year, 'Race');
+                const qualSeasonResults = await fetchAllSeasonResults(year, 'Qualifying');
+                const champDrivers = await fetchChampionshipDrivers(year);
+                const champTeams = await fetchChampionshipTeams(year);
 
                 if (!classification || classification.length === 0) {
                     alert("Official race results (classification) not yet available on OpenF1.");

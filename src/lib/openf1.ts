@@ -161,22 +161,24 @@ export async function fetchAllSeasonResults(year: number, sessionType: 'Race' | 
 
         if (!sessions || sessions.length === 0) return [];
 
-        // 2. Fetch session_result for each session in parallel
-        const allResults = await Promise.all(
-            sessions.map(async (sess) => {
-                try {
-                    const res = await fetch(
-                        `${OPENF1_BASE}/session_result?session_key=${sess.session_key}`,
-                        { next: { revalidate: 300 } }
-                    );
-                    if (!res.ok) return [];
+        // 2. Fetch session_result for each session sequentially to avoid 429 Too Many Requests
+        const allResults: any[] = [];
+        for (const sess of sessions) {
+            try {
+                const res = await fetch(
+                    `${OPENF1_BASE}/session_result?session_key=${sess.session_key}`,
+                    { next: { revalidate: 300 } }
+                );
+                if (res.ok) {
                     const data = await res.json();
-                    return data as any[];
-                } catch {
-                    return [];
+                    allResults.push(data);
                 }
-            })
-        );
+                // Optional short pause to be gentle to the API
+                await new Promise(r => setTimeout(r, 50));
+            } catch {
+                // Skip silently on failure to allow other sessions to complete
+            }
+        }
 
         // Flatten into a single array, tagging each record with the session_key
         return allResults.flat();
