@@ -151,37 +151,25 @@ export async function fetchChampionshipTeams(year: number) {
  */
 export async function fetchAllSeasonResults(year: number, sessionType: 'Race' | 'Qualifying') {
     try {
-        // 1. Get all sessions of the requested type for the year
-        const sessionsRes = await fetch(
-            `${OPENF1_BASE}/sessions?year=${year}&session_type=${sessionType}`,
-            { next: { revalidate: 300 } }
-        );
+        const sessionsRes = await fetch(`${OPENF1_BASE}/sessions?year=${year}&session_type=${sessionType}`);
         if (!sessionsRes.ok) return [];
         const sessions: SessionInfo[] = await sessionsRes.json();
-
+        
         if (!sessions || sessions.length === 0) return [];
-
-        // 2. Fetch session_result for each session sequentially to avoid 429 Too Many Requests
-        const allResults: any[] = [];
-        for (const sess of sessions) {
-            try {
-                const res = await fetch(
-                    `${OPENF1_BASE}/session_result?session_key=${sess.session_key}`,
-                    { next: { revalidate: 300 } }
-                );
-                if (res.ok) {
+        
+        const results = await Promise.all(
+            sessions.map(async (sess) => {
+                try {
+                    const res = await fetch(`${OPENF1_BASE}/session_result?session_key=${sess.session_key}`);
+                    if (!res.ok) return [];
                     const data = await res.json();
-                    allResults.push(data);
+                    return data.map((d: any) => ({ ...d, session_key: sess.session_key }));
+                } catch {
+                    return [];
                 }
-                // Optional short pause to be gentle to the API
-                await new Promise(r => setTimeout(r, 50));
-            } catch {
-                // Skip silently on failure to allow other sessions to complete
-            }
-        }
-
-        // Flatten into a single array, tagging each record with the session_key
-        return allResults.flat();
+            })
+        );
+        return results.flat();
     } catch {
         return [];
     }
