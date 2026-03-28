@@ -446,8 +446,12 @@ export default function AdminPage() {
 
                 const getOurDriverName = (driverNum: number) => getOurDriver(driverNum)?.name;
 
-                // 1. Podiums - Sort by position just in case
-                const sortedResults = [...classification].sort((a: any, b: any) => a.position - b.position);
+                // 1. Podiums - Sort by position just in case (handles null positions for DNFs from F1 API)
+                const sortedResults = [...classification].sort((a: any, b: any) => {
+                    const posA = a.position === null ? 999 : a.position;
+                    const posB = b.position === null ? 999 : b.position;
+                    return posA - posB;
+                });
 
                 const p1 = getOurDriverName(sortedResults.find((r: any) => r.position === 1)?.driver_number);
                 const p2 = getOurDriverName(sortedResults.find((r: any) => r.position === 2)?.driver_number);

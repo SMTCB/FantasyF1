@@ -16,9 +16,6 @@ export interface SessionInfo {
     year: number;
 }
 
-/**
- * Fetch the Race session for a given meeting (round).
- */
 export async function fetchRaceSession(year: number, countryName: string): Promise<SessionInfo | null> {
     try {
         const res = await fetch(
@@ -27,7 +24,7 @@ export async function fetchRaceSession(year: number, countryName: string): Promi
         );
         if (!res.ok) return null;
         const data: SessionInfo[] = await res.json();
-        return data[0] || null;
+        return data.find((s: SessionInfo) => s.session_name === 'Race') || data[0] || null;
     } catch {
         return null;
     }

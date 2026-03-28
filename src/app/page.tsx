@@ -39,7 +39,8 @@ export default function DashboardPage() {
                 const { data, error } = await supabase
                     .from('leaderboard')
                     .select('*')
-                    .order('total_points', { ascending: false });
+                    .order('race_points', { ascending: false })
+                    .order('year_points', { ascending: false });
 
                 if (error) throw error;
 

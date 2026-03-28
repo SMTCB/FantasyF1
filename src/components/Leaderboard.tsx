@@ -18,7 +18,11 @@ interface LeaderboardProps {
 }
 
 export default function Leaderboard({ entries }: LeaderboardProps) {
-    const sorted = [...entries].sort((a, b) => b.totalPoints - a.totalPoints);
+    const sorted = [...entries].sort((a, b) => {
+        const raceDiff = (b.racePoints || 0) - (a.racePoints || 0);
+        if (raceDiff !== 0) return raceDiff;
+        return (b.yearPoints || 0) - (a.yearPoints || 0);
+    });
 
     return (
         <div className="space-y-2">
@@ -84,11 +88,6 @@ export default function Leaderboard({ entries }: LeaderboardProps) {
                                 <div className="font-semibold text-sm truncate">
                                     {entry.displayName}
                                 </div>
-                                {(entry.yearPoints !== undefined && entry.yearPoints > 0) && (
-                                    <div className="text-[10px] text-[var(--color-carbon-400)] mt-0.5">
-                                        {(entry.racePoints ?? 0)} race + <span className="text-[var(--color-warning)] font-medium">{(entry.yearPoints ?? 0)} year*</span>
-                                    </div>
-                                )}
                             </div>
 
                             {/* Trend */}
@@ -104,8 +103,17 @@ export default function Leaderboard({ entries }: LeaderboardProps) {
                                 )}
                             </div>
 
-                            {/* Points */}
-                            <div className="score-pill">{entry.totalPoints}</div>
+                            {/* Points (Race main, Year prelim) */}
+                            <div className="flex items-center gap-1.5">
+                                <div className="score-pill" title="Race Points">
+                                    {entry.racePoints ?? 0}
+                                </div>
+                                {(entry.yearPoints !== undefined && entry.yearPoints > 0) && (
+                                    <div className="score-pill border-[var(--color-warning)]/30 text-[var(--color-warning)] bg-[var(--color-warning)]/10" title="Preliminary Year Points">
+                                        +{entry.yearPoints}
+                                    </div>
+                                )}
+                            </div>
                         </motion.div>
                     );
                 })}
