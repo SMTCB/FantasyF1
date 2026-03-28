@@ -400,7 +400,7 @@ export default function AdminPage() {
             const requiredFields: (keyof YearResult)[] = [
                 'driverChampion', 'driverP2', 'driverP3', 'constructorChampion',
                 'lastConstructor', 'fewestFinishersRace', 'mostDnfsDriver',
-                'firstDriverReplaced', 'mostPoles', 'mostPodiumsNoWin'
+                'mostPoles', 'mostPodiumsNoWin'
             ];
 
             for (const field of requiredFields) {
