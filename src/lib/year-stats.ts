@@ -2,7 +2,7 @@
 // Year Stats Aggregation — Derived from OpenF1 Season Data
 // ═══════════════════════════════════════════════════════════
 
-import { ALL_DRIVERS } from './f1-data';
+import { ALL_DRIVERS, TEAMS } from './f1-data';
 
 export interface ComputedYearStats {
     // Driver standings (from championship_drivers beta endpoint)
@@ -52,10 +52,11 @@ export function mapDriverNumber(
     const fallbackLastName = dInfo.full_name?.split(' ').pop()?.toLowerCase() || '';
 
     const match = ALL_DRIVERS.find((d) => {
-        const normalized = d.name.toLowerCase();
+        const ourNormalizedLast = d.name.toLowerCase().split(' ').pop();
         return (
-            (lastName && normalized.includes(lastName)) ||
-            (fallbackLastName && normalized.includes(fallbackLastName))
+            (lastName && ourNormalizedLast === lastName) ||
+            (fallbackLastName && ourNormalizedLast === fallbackLastName) ||
+            (fallbackLastName && d.name.toLowerCase().includes(fallbackLastName))
         );
     });
     return match?.name;
@@ -151,8 +152,7 @@ export function computeYearStats(
     const resolveTeam = (openf1Name: string): string | null => {
         if (!openf1Name) return null;
         const lower = openf1Name.toLowerCase();
-        const { TEAMS } = require('./f1-data');
-        const team = (TEAMS as any[]).find(
+        const team = TEAMS.find(
             (t: any) =>
                 t.name.toLowerCase().includes(lower) ||
                 lower.includes(t.shortName.toLowerCase())
@@ -209,7 +209,6 @@ export function computeYearStats(
         raceResults.forEach((r: any) => {
             const name = resolve(r.driver_number);
             if (name && r.points) {
-                const { ALL_DRIVERS } = require('./f1-data');
                 const driverObj = ALL_DRIVERS.find((d: any) => d.name === name);
                 const teamName = driverObj?.team;
                 if (teamName) {
@@ -225,8 +224,7 @@ export function computeYearStats(
             constructorChampion = sortedManualTeams[0] ?? null;
             // Get the last team that actually scored points (or just theoretically last of the known teams)
             // If they want the last team in the grid, we need all 10 teams...
-            const { TEAMS } = require('./f1-data');
-            const allTeamNames = (TEAMS as any[]).map(t => t.shortName);
+            const allTeamNames = TEAMS.map(t => t.shortName);
             const teamPointsFull = allTeamNames.map(t => ({ team: t, pts: manualTeamPoints[t] || 0 }));
             teamPointsFull.sort((a, b) => b.pts - a.pts);
 

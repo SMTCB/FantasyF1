@@ -439,8 +439,8 @@ export default function AdminPage() {
                     const lastName = (dInfo.name_acronym || dInfo.broadcast_name?.split(' ').pop() || '').toLowerCase();
                     const fallbackLastName = dInfo.full_name?.split(' ').pop()?.toLowerCase() || 'xxx';
                     return ALL_DRIVERS.find(d => {
-                        const ourNormalized = d.name.toLowerCase();
-                        return ourNormalized.includes(lastName) || ourNormalized.includes(fallbackLastName);
+                        const ourNormalizedLast = d.name.toLowerCase().split(' ').pop();
+                        return ourNormalizedLast === lastName || ourNormalizedLast === fallbackLastName || d.name.toLowerCase().includes(fallbackLastName);
                     });
                 };
 
