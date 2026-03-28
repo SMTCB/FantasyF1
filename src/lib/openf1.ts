@@ -157,19 +157,39 @@ export async function fetchAllSeasonResults(year: number, sessionType: 'Race' | 
         
         if (!sessions || sessions.length === 0) return [];
         
-        const results = await Promise.all(
-            sessions.map(async (sess) => {
+        // Batch requests into small chunks (e.g. 3 at a time) to avoid 429
+        const CHUNK_SIZE = 3;
+        const BATCH_DELAY_MS = 300;
+        const allResults: any[] = [];
+
+        for (let i = 0; i < sessions.length; i += CHUNK_SIZE) {
+            const chunk = sessions.slice(i, i + CHUNK_SIZE);
+            const chunkPromises = chunk.map(async (sess) => {
                 try {
                     const res = await fetch(`${OPENF1_BASE}/session_result?session_key=${sess.session_key}`);
                     if (!res.ok) return [];
                     const data = await res.json();
-                    return data.map((d: any) => ({ ...d, session_key: sess.session_key }));
+                    
+                    if (Array.isArray(data)) {
+                        return data.map((d: any) => ({ ...d, session_key: sess.session_key }));
+                    } else if (data && data.error) {
+                         return [];
+                    }
+                    return [];
                 } catch {
                     return [];
                 }
-            })
-        );
-        return results.flat();
+            });
+
+            const resolvedChunk = await Promise.all(chunkPromises);
+            allResults.push(...resolvedChunk.flat());
+
+            if (i + CHUNK_SIZE < sessions.length) {
+                await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+            }
+        }
+
+        return allResults;
     } catch {
         return [];
     }
