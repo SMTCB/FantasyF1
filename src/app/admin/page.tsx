@@ -33,6 +33,83 @@ import { createClient } from '@/lib/supabase/client';
 import { useEffect, useCallback } from 'react';
 import { scoreRaceBet, scoreYearBet, type RaceBet, type RaceResult, type YearBet, type YearResult } from '@/lib/scoring';
 
+function MultiSelect({
+    value,
+    options,
+    onChange,
+    placeholder
+}: {
+    value: string;
+    options: { label: string, value: string }[];
+    onChange: (val: string) => void;
+    placeholder: string;
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+    
+    // Parse comma separated values natively
+    const cleanValue = value ? value.replace(/ \(Computed tie\)/g, '') : '';
+    const selectedVals = cleanValue ? cleanValue.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+    const toggleVal = (v: string) => {
+        let newVals;
+        if (selectedVals.includes(v)) {
+            newVals = selectedVals.filter(s => s !== v);
+        } else {
+            newVals = [...selectedVals, v];
+        }
+        onChange(newVals.join(', '));
+    };
+
+    return (
+        <div className="relative">
+            <div 
+                className="input-field text-sm cursor-pointer min-h-[38px] flex flex-wrap gap-1 items-center"
+                onClick={() => setIsOpen(!isOpen)}
+            >
+                {selectedVals.length === 0 && <span className="text-[var(--color-carbon-400)]">{placeholder}</span>}
+                {selectedVals.map(val => (
+                    <span key={val} className="bg-[var(--color-carbon-800)] px-2 py-0.5 rounded text-xs flex items-center gap-1 border border-[var(--color-carbon-700)]">
+                        {val}
+                        <button 
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); toggleVal(val); }}
+                            className="text-[var(--color-carbon-400)] hover:text-white"
+                        >×</button>
+                    </span>
+                ))}
+            </div>
+            
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div 
+                        initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
+                        className="absolute z-50 top-full left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-[var(--color-carbon-900)] border border-[var(--color-carbon-700)] rounded-md shadow-xl"
+                    >
+                        {options.map(opt => (
+                            <label key={opt.value} className="flex items-center gap-2 px-3 py-2 hover:bg-[var(--color-carbon-800)] cursor-pointer border-b border-[var(--color-carbon-800)] last:border-0">
+                                <input 
+                                    type="checkbox" 
+                                    checked={selectedVals.includes(opt.value)}
+                                    onChange={() => toggleVal(opt.value)}
+                                    className="accent-[var(--color-primary)]"
+                                />
+                                <span className="text-sm">{opt.label}</span>
+                            </label>
+                        ))}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            
+            {isOpen && (
+                <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setIsOpen(false)}
+                />
+            )}
+        </div>
+    );
+}
+
 type AdminTab = 'results' | 'scores' | 'yearend';
 
 export default function AdminPage() {
@@ -368,20 +445,25 @@ export default function AdminPage() {
 
             // 3. Score each bet
             const scorePromises = (bets || []).map(async (bet) => {
-                const yearBet: YearBet = {
-                    driverChampion: bet.driver_champion,
-                    driverP2: bet.driver_p2,
-                    driverP3: bet.driver_p3,
-                    constructorChampion: bet.constructor_champion,
-                    lastConstructor: bet.last_constructor,
-                    fewestFinishersRace: bet.fewest_finishers_race,
-                    mostDnfsDriver: bet.most_dnfs_driver,
-                    firstDriverReplaced: bet.first_driver_replaced,
-                    mostPoles: bet.most_poles,
-                    mostPodiumsNoWin: bet.most_podiums_no_win
+                let pts = 0;
+                const checkMatch = (betVal: string | null, formVal: string | undefined) => {
+                    if (!betVal || !formVal) return false;
+                    const answers = formVal.replace(/ \(Computed tie\)/g, '').split(',').map(s => s.trim());
+                    return answers.includes(betVal);
                 };
 
-                const score = scoreYearBet(yearBet, yearResult);
+                if (checkMatch(bet.driver_champion, yearResultsForm.driverChampion)) pts += YEAR_BET_SCORING.DRIVER_CHAMPION;
+                if (checkMatch(bet.driver_p2, yearResultsForm.driverP2)) pts += YEAR_BET_SCORING.DRIVER_P2;
+                if (checkMatch(bet.driver_p3, yearResultsForm.driverP3)) pts += YEAR_BET_SCORING.DRIVER_P3;
+
+                if (checkMatch(bet.constructor_champion, yearResultsForm.constructorChampion)) pts += YEAR_BET_SCORING.CONSTRUCTOR_CHAMPION;
+                if (checkMatch(bet.last_constructor, yearResultsForm.lastConstructor)) pts += YEAR_BET_SCORING.LAST_CONSTRUCTOR;
+
+                if (checkMatch(bet.fewest_finishers_race, yearResultsForm.fewestFinishersRace)) pts += YEAR_BET_SCORING.FEWEST_FINISHERS_RACE;
+                if (checkMatch(bet.most_dnfs_driver, yearResultsForm.mostDnfsDriver)) pts += YEAR_BET_SCORING.MOST_DNFS_DRIVER;
+                if (checkMatch(bet.first_driver_replaced, yearResultsForm.firstDriverReplaced)) pts += YEAR_BET_SCORING.FIRST_DRIVER_REPLACED;
+                if (checkMatch(bet.most_poles, yearResultsForm.mostPoles)) pts += YEAR_BET_SCORING.MOST_POLES;
+                if (checkMatch(bet.most_podiums_no_win, yearResultsForm.mostPodiumsNoWin)) pts += YEAR_BET_SCORING.MOST_PODIUMS_NO_WIN;
 
                 return supabase
                     .from('scores')
@@ -389,8 +471,8 @@ export default function AdminPage() {
                         user_id: bet.user_id,
                         round: null, // Year scores have null round usually or handled by type
                         score_type: 'year',
-                        year_breakdown: score.breakdown,
-                        total_points: score.total,
+                        year_breakdown: { total: pts },
+                        total_points: pts,
                         scored_at: new Date().toISOString()
                     }, {
                         onConflict: 'user_id, round, score_type'
@@ -423,12 +505,13 @@ export default function AdminPage() {
                     return;
                 }
 
-                // Safely clear the form now that we have successful API payload
+                // Safely clear automated fields but preserve manual arrays and answers
                 setResultsForm(prev => ({
                     ...prev,
                     [round]: {
                         ...(prev[round] || {}),
-                        p1: '', p2: '', p3: '', dnf: [], teamMostPoints: '', specialCategoryAnswer: ''
+                        p1: '', p2: '', p3: '', teamMostPoints: ''
+                        // Leave dnf and specialCategoryAnswer ALONE so manual overrides are not aggressively deleted!
                     }
                 }));
 
@@ -492,7 +575,17 @@ export default function AdminPage() {
                     .map((res: any) => getOurDriverName(res.driver_number))
                     .filter(Boolean) as string[];
 
-                handleDnfChange(round, dnfDrivers);
+                setResultsForm(prev => {
+                    const prevDnfs = prev[round]?.dnf || [];
+                    const merged = Array.from(new Set([...prevDnfs, ...dnfDrivers]));
+                    return {
+                        ...prev,
+                        [round]: {
+                            ...(prev[round] || {}),
+                            dnf: merged
+                        }
+                    };
+                });
 
                 // 4. Compute Year Stats
                 const stats = computeYearStats(raceSeasonResults, qualSeasonResults, driverInfo, champDrivers, champTeams);
@@ -926,17 +1019,12 @@ export default function AdminPage() {
                                     return (
                                         <div key={label}>
                                             <label className="data-readout text-[9px] block mb-1">{label.toUpperCase()}</label>
-                                            <select
+                                            <MultiSelect
                                                 value={val || ''}
-                                                onChange={(e) => handleYearFormChange(fieldKey, e.target.value)}
-                                                className="input-field text-sm"
-                                            >
-                                                <option value="">Select driver...</option>
-                                                {isCustom && <option value={val}>{val} (Computed)</option>}
-                                                {ALL_DRIVERS.map(d => (
-                                                    <option key={d.name} value={d.name}>{d.name} ({d.team})</option>
-                                                ))}
-                                            </select>
+                                                onChange={(newVal) => handleYearFormChange(fieldKey, newVal)}
+                                                placeholder="Select driver(s)..."
+                                                options={ALL_DRIVERS.map(d => ({ label: `${d.name} (${d.team})`, value: d.name }))}
+                                            />
                                         </div>
                                     );
                                 })}
@@ -955,17 +1043,12 @@ export default function AdminPage() {
                                     return (
                                         <div key={label}>
                                             <label className="data-readout text-[9px] block mb-1">{label.toUpperCase()}</label>
-                                            <select
+                                            <MultiSelect
                                                 value={val || ''}
-                                                onChange={(e) => handleYearFormChange(fieldKey, e.target.value)}
-                                                className="input-field text-sm"
-                                            >
-                                                <option value="">Select team...</option>
-                                                {isCustom && <option value={val}>{val} (Computed)</option>}
-                                                {TEAMS.map(t => (
-                                                    <option key={t.shortName} value={t.shortName}>{t.name}</option>
-                                                ))}
-                                            </select>
+                                                onChange={(newVal) => handleYearFormChange(fieldKey, newVal)}
+                                                placeholder="Select team(s)..."
+                                                options={TEAMS.map(t => ({ label: t.name, value: t.shortName }))}
+                                            />
                                         </div>
                                     );
                                 })}
@@ -994,23 +1077,16 @@ export default function AdminPage() {
                                     return (
                                         <div key={cat.id}>
                                             <label className="data-readout text-[9px] block mb-1">{cat.label.toUpperCase()}</label>
-                                            <select
+                                            <MultiSelect
                                                 value={val || ''}
-                                                onChange={(e) => handleYearFormChange(cat.id as keyof YearResult, e.target.value)}
-                                                className="input-field text-sm"
-                                            >
-                                                <option value="">Select...</option>
-                                                {isCustom && <option value={val}>{val} (Computed tie)</option>}
-                                                {cat.type === 'driver' && ALL_DRIVERS.map(d => (
-                                                    <option key={d.name} value={d.name}>{d.name}</option>
-                                                ))}
-                                                {cat.type === 'team' && TEAMS.map(t => (
-                                                    <option key={t.shortName} value={t.shortName}>{t.shortName}</option>
-                                                ))}
-                                                {cat.type === 'race' && CALENDAR.map(r => (
-                                                    <option key={r.round} value={r.gp}>{r.gp}</option>
-                                                ))}
-                                            </select>
+                                                onChange={(newVal) => handleYearFormChange(cat.id as keyof YearResult, newVal)}
+                                                placeholder="Select answers..."
+                                                options={
+                                                    cat.type === 'driver' ? ALL_DRIVERS.map(d => ({ label: `${d.name} (${d.team})`, value: d.name }))
+                                                    : cat.type === 'team' ? TEAMS.map(t => ({ label: t.name, value: t.shortName }))
+                                                    : CALENDAR.map(r => ({ label: r.gp, value: r.gp }))
+                                                }
+                                            />
                                         </div>
                                     );
                                 })}
