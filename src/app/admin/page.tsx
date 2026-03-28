@@ -432,6 +432,15 @@ export default function AdminPage() {
                     return;
                 }
 
+                // Safely clear the form now that we have successful API payload
+                setResultsForm(prev => ({
+                    ...prev,
+                    [round]: {
+                        ...(prev[round] || {}),
+                        p1: '', p2: '', p3: '', dnf: [], teamMostPoints: '', specialCategoryAnswer: ''
+                    }
+                }));
+
                 // Map driver number to our system driver
                 const getOurDriver = (driverNum: number) => {
                     const dInfo = driverInfo.find((d: any) => d.driver_number === driverNum);
