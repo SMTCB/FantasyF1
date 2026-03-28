@@ -18,9 +18,8 @@ export interface SessionInfo {
 
 export async function fetchRaceSession(year: number, countryName: string): Promise<SessionInfo | null> {
     try {
-        const res = await fetch(
-            `${OPENF1_BASE}/sessions?year=${year}&country_name=${encodeURIComponent(countryName)}&session_type=Race`,
-            { next: { revalidate: 300 } }
+        const res = await fetchWithRetry(
+            `${OPENF1_BASE}/sessions?year=${year}&country_name=${encodeURIComponent(countryName)}&session_type=Race`
         );
         if (!res.ok) return null;
         const data: SessionInfo[] = await res.json();
@@ -35,9 +34,8 @@ export async function fetchRaceSession(year: number, countryName: string): Promi
  */
 export async function fetchQualifyingSession(year: number, countryName: string): Promise<SessionInfo | null> {
     try {
-        const res = await fetch(
-            `${OPENF1_BASE}/sessions?year=${year}&country_name=${encodeURIComponent(countryName)}&session_type=Qualifying`,
-            { next: { revalidate: 300 } }
+        const res = await fetchWithRetry(
+            `${OPENF1_BASE}/sessions?year=${year}&country_name=${encodeURIComponent(countryName)}&session_type=Qualifying`
         );
         if (!res.ok) return null;
         const data: SessionInfo[] = await res.json();
@@ -71,9 +69,8 @@ export function getLockTime(sessionStart: string): Date {
  */
 export async function fetchRaceResults(sessionKey: number) {
     try {
-        const res = await fetch(
-            `${OPENF1_BASE}/position?session_key=${sessionKey}`,
-            { next: { revalidate: 60 } }
+        const res = await fetchWithRetry(
+            `${OPENF1_BASE}/position?session_key=${sessionKey}`
         );
         if (!res.ok) return [];
         return res.json();
@@ -87,9 +84,8 @@ export async function fetchRaceResults(sessionKey: number) {
  */
 export async function fetchDrivers(sessionKey: number) {
     try {
-        const res = await fetch(
-            `${OPENF1_BASE}/drivers?session_key=${sessionKey}`,
-            { next: { revalidate: 300 } }
+        const res = await fetchWithRetry(
+            `${OPENF1_BASE}/drivers?session_key=${sessionKey}`
         );
         if (!res.ok) return [];
         return res.json();
@@ -102,9 +98,8 @@ export async function fetchDrivers(sessionKey: number) {
  */
 export async function fetchSessionResult(sessionKey: number) {
     try {
-        const res = await fetch(
-            `${OPENF1_BASE}/session_result?session_key=${sessionKey}`,
-            { next: { revalidate: 60 } }
+        const res = await fetchWithRetry(
+            `${OPENF1_BASE}/session_result?session_key=${sessionKey}`
         );
         if (!res.ok) return [];
         return res.json();
@@ -118,9 +113,8 @@ export async function fetchSessionResult(sessionKey: number) {
  */
 export async function fetchChampionshipDrivers(year: number) {
     try {
-        const res = await fetch(
-            `${OPENF1_BASE}/championship_drivers?year=${year}`,
-            { next: { revalidate: 300 } }
+        const res = await fetchWithRetry(
+            `${OPENF1_BASE}/championship_drivers?year=${year}`
         );
         if (!res.ok) return [];
         return res.json();
@@ -134,9 +128,8 @@ export async function fetchChampionshipDrivers(year: number) {
  */
 export async function fetchChampionshipTeams(year: number) {
     try {
-        const res = await fetch(
-            `${OPENF1_BASE}/championship_teams?year=${year}`,
-            { next: { revalidate: 300 } }
+        const res = await fetchWithRetry(
+            `${OPENF1_BASE}/championship_teams?year=${year}`
         );
         if (!res.ok) return [];
         return res.json();
@@ -149,31 +142,42 @@ export async function fetchChampionshipTeams(year: number) {
  * Fetch all session results for every race (or qualifying) session in a year.
  * Returns a flat array of [{ session_key, session_type, results[] }] objects.
  */
+async function fetchWithRetry(url: string, maxRetries = 5) {
+    for (let i = 0; i < maxRetries; i++) {
+        const res = await fetch(url);
+        if (res.ok) return res;
+        if (res.status === 404) return res; // Valid response for future races (no data)
+        if (res.status === 429) {
+            await new Promise(r => setTimeout(r, 1000 * (i + 1))); // Exponential backoff scaling
+            continue;
+        }
+        return res; // Let other statuses pass through (e.g. 500)
+    }
+    return fetch(url);
+}
+
 export async function fetchAllSeasonResults(year: number, sessionType: 'Race' | 'Qualifying') {
     try {
-        const sessionsRes = await fetch(`${OPENF1_BASE}/sessions?year=${year}&session_type=${sessionType}`);
+        const sessionsRes = await fetchWithRetry(`${OPENF1_BASE}/sessions?year=${year}&session_type=${sessionType}`);
         if (!sessionsRes.ok) return [];
         const sessions: SessionInfo[] = await sessionsRes.json();
         
         if (!sessions || sessions.length === 0) return [];
         
-        // Batch requests into small chunks (e.g. 3 at a time) to avoid 429
-        const CHUNK_SIZE = 3;
-        const BATCH_DELAY_MS = 300;
         const allResults: any[] = [];
+        const CHUNK_SIZE = 3;
+        const BATCH_DELAY_MS = 500;
 
         for (let i = 0; i < sessions.length; i += CHUNK_SIZE) {
             const chunk = sessions.slice(i, i + CHUNK_SIZE);
             const chunkPromises = chunk.map(async (sess) => {
                 try {
-                    const res = await fetch(`${OPENF1_BASE}/session_result?session_key=${sess.session_key}`);
+                    const res = await fetchWithRetry(`${OPENF1_BASE}/session_result?session_key=${sess.session_key}`);
                     if (!res.ok) return [];
                     const data = await res.json();
                     
                     if (Array.isArray(data)) {
                         return data.map((d: any) => ({ ...d, session_key: sess.session_key }));
-                    } else if (data && data.error) {
-                         return [];
                     }
                     return [];
                 } catch {
