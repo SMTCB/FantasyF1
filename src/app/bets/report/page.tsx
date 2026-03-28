@@ -15,14 +15,14 @@ import {
     Crosshair,
     Award,
     Lock,
-    EyeOff
+    EyeOff,
+    CheckCircle2
 } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { createClient } from '@/lib/supabase/client';
 import { CALENDAR, getNextRace, ALL_DRIVERS, TEAMS, RACE_BET_SCORING } from '@/lib/f1-data';
 import { isBetLocked } from '@/lib/openf1';
 
-// Same structure as in page.tsx for year bets
 const YEAR_BET_CATEGORIES = [
     { id: 'driver_champion', label: 'Driver Champion', icon: <Crown size={14} />, type: 'driver', dbKey: 'driver_champion' },
     { id: 'driver_p2', label: 'Driver Runner-up', icon: <Medal size={14} />, type: 'driver', dbKey: 'driver_p2' },
@@ -45,12 +45,14 @@ export default function BetsReportPage() {
 
     // Year Bets State
     const [isYearLocked, setIsYearLocked] = useState(false);
+    const [yearResults, setYearResults] = useState<any>(null);
     const [yearBets, setYearBets] = useState<any[]>([]);
     const [expandedYearUser, setExpandedYearUser] = useState<string | null>(null);
 
     // Race Bets State
     const [selectedRound, setSelectedRound] = useState<number>(0);
     const [raceLockStatus, setRaceLockStatus] = useState<Record<number, boolean>>({});
+    const [raceScoredStatus, setRaceScoredStatus] = useState<Record<number, boolean>>({});
     const [raceBets, setRaceBets] = useState<any[]>([]);
     const [raceScores, setRaceScores] = useState<any[]>([]);
     const supabase = createClient();
@@ -72,25 +74,30 @@ export default function BetsReportPage() {
                 }
                 setUsersMap(userMapObj);
 
-                // 2. Fetch Year Bets Status
-                const { data: lockData } = await supabase
+                // 2. Fetch Year Bets Status & Projections
+                const { data: yData } = await supabase
                     .from('year_results')
-                    .select('is_bets_locked')
+                    .select('*')
                     .eq('season', 2026)
                     .single();
 
-                const yearLocked = lockData ? lockData.is_bets_locked : false;
-                setIsYearLocked(yearLocked);
+                if (yData) {
+                    setIsYearLocked(yData.is_bets_locked);
+                    setYearResults(yData);
+                } else {
+                    setIsYearLocked(false);
+                }
 
                 // 3. If year bets are locked, fetch them
-                if (yearLocked) {
+                if (yData?.is_bets_locked) {
                     const { data: yBets } = await supabase.from('bets_year').select('*');
                     if (yBets) setYearBets(yBets);
                 }
 
-                // 4. Fetch Race Statuses (which races are locked)
+                // 4. Fetch Race Statuses (locked & scored)
                 const { data: racesData } = await supabase.from('races').select('round, session_start, is_manual_unlock, is_scored');
                 const lockMap: Record<number, boolean> = {};
+                const scoreMap: Record<number, boolean> = {};
                 let latestClosedRound = 1;
 
                 if (racesData) {
@@ -107,6 +114,7 @@ export default function BetsReportPage() {
                         const locked = r.is_manual_unlock ? false : isNaturallyLocked;
 
                         lockMap[r.round] = locked;
+                        scoreMap[r.round] = r.is_scored;
 
                         if (locked && r.round > latestClosedRound) {
                             latestClosedRound = r.round;
@@ -114,6 +122,7 @@ export default function BetsReportPage() {
                     });
                 }
                 setRaceLockStatus(lockMap);
+                setRaceScoredStatus(scoreMap);
                 setSelectedRound(latestClosedRound);
 
                 // 5. Fetch ALL race bets
@@ -157,7 +166,14 @@ export default function BetsReportPage() {
         }
 
         return (
-            <div className="space-y-3 mt-4">
+            <div className="space-y-3 mt-4 mb-4">
+                <div className="flex flex-wrap items-center gap-4 px-3 py-2.5 mb-2 bg-[var(--color-carbon-900)] rounded-lg text-[9px] font-mono tracking-wider border border-[var(--color-carbon-800)]">
+                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-[var(--color-carbon-500)] rounded-sm"></div> PENDING</div>
+                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-[var(--color-warning)] rounded-sm shadow-[0_0_4px_var(--color-warning)]"></div> PRELIM CORRECT</div>
+                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-[var(--color-success)] rounded-sm shadow-[0_0_4px_var(--color-success)]"></div> FINAL CORRECT</div>
+                    <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-[var(--color-danger)] rounded-sm shadow-[0_0_4px_var(--color-danger)]"></div> INCORRECT</div>
+                </div>
+
                 {yearBets.map((bet) => {
                     const user = usersMap[bet.user_id] || { displayName: 'Unknown Racer', avatar: '🏁' };
                     const isExpanded = expandedYearUser === bet.user_id;
@@ -187,13 +203,36 @@ export default function BetsReportPage() {
                                         className="overflow-hidden bg-[var(--color-carbon-900)]/50"
                                     >
                                         <div className="p-4 pt-1 border-t border-[var(--color-carbon-800)] grid grid-cols-1 gap-1.5">
-                                            {YEAR_BET_CATEGORIES.map(cat => (
-                                                <div key={cat.id} className="flex items-center gap-2 text-xs py-1.5 border-b border-[var(--color-carbon-800)]/50 last:border-0">
-                                                    <span className="text-[var(--color-carbon-400)] w-5 flex justify-center">{cat.icon}</span>
-                                                    <span className="text-[var(--color-carbon-400)] w-32 truncate">{cat.label}:</span>
-                                                    <span className="font-semibold text-white truncate">{bet[cat.dbKey] || '—'}</span>
-                                                </div>
-                                            ))}
+                                            {YEAR_BET_CATEGORIES.map(cat => {
+                                                const adminVal = yearResults ? yearResults[cat.dbKey] : null;
+                                                const betVal = bet[cat.dbKey];
+                                                
+                                                let stateColor = "text-[var(--color-carbon-400)]";
+                                                let bgState = "transparent";
+                                                let valColor = "text-white";
+
+                                                if (adminVal && betVal) {
+                                                    // use includes for tying gracefully (e.g. "Piastri, Norris".includes("Lando Norris"))
+                                                    if (adminVal.includes(betVal)) {
+                                                        const isFinal = yearResults.is_final;
+                                                        stateColor = isFinal ? "text-[var(--color-success)]" : "text-[var(--color-warning)]";
+                                                        valColor = stateColor;
+                                                        bgState = isFinal ? "bg-[var(--color-success)]/10" : "bg-[var(--color-warning)]/10";
+                                                    } else {
+                                                        stateColor = "text-[var(--color-danger)]";
+                                                        valColor = stateColor;
+                                                        bgState = "bg-[var(--color-danger)]/5";
+                                                    }
+                                                }
+
+                                                return (
+                                                    <div key={cat.id} className={`flex items-center gap-2 text-xs py-1.5 px-2 -mx-2 rounded-sm transition-colors ${bgState}`}>
+                                                        <span className={`${stateColor} w-5 flex justify-center`}>{cat.icon}</span>
+                                                        <span className={`${stateColor} w-32 truncate`}>{cat.label}:</span>
+                                                        <span className={`font-semibold ${valColor} truncate`}>{betVal || '—'}</span>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </motion.div>
                                 )}
@@ -217,6 +256,7 @@ export default function BetsReportPage() {
                 <div className="flex overflow-x-auto pb-4 -mx-5 px-5 gap-2 snap-x hide-scrollbar">
                     {CALENDAR.map(race => {
                         const locked = raceLockStatus[race.round];
+                        const isScored = raceScoredStatus[race.round];
                         const isSelected = selectedRound === race.round;
 
                         return (
@@ -224,17 +264,28 @@ export default function BetsReportPage() {
                                 key={race.round}
                                 onClick={() => setSelectedRound(race.round)}
                                 className={`
-                                    flex-shrink-0 px-4 py-2 rounded-lg text-xs font-medium uppercase tracking-wider transition-all snap-start whitespace-nowrap
+                                    flex flex-col items-center justify-center flex-shrink-0 px-4 py-2 rounded-lg transition-all snap-start min-w-[64px]
                                     ${isSelected
-                                        ? 'bg-[var(--color-f1-red)]/15 text-[var(--color-f1-red)] border border-[var(--color-f1-red)]/30'
-                                        : 'bg-[var(--color-carbon-800)] text-[var(--color-carbon-400)] border border-[var(--color-carbon-700)]'
+                                        ? 'bg-[var(--color-f1-red)]/15 border-2 border-[var(--color-f1-red)]/50'
+                                        : isScored
+                                            ? 'bg-[var(--color-success)]/5 text-[var(--color-success)] border border-[var(--color-success)]/20'
+                                            : 'bg-[var(--color-carbon-800)] text-[var(--color-carbon-400)] border border-[var(--color-carbon-700)]'
                                     }
-                                    ${!locked && !isSelected ? 'opacity-60' : ''}
+                                    ${!locked && !isSelected && !isScored ? 'opacity-60' : ''}
                                 `}
-                                style={{ fontFamily: 'var(--font-mono)' }}
                             >
-                                R{String(race.round).padStart(2, '0')}
-                                {locked ? ' 🔒' : ''}
+                                <div className={`text-xs font-bold uppercase tracking-wider font-mono ${isSelected ? 'text-[var(--color-f1-red)]' : ''}`}>
+                                     R{String(race.round).padStart(2, '0')}
+                                </div>
+                                <div className="mt-0.5 flex items-center justify-center h-4">
+                                    {isScored ? (
+                                        <CheckCircle2 size={12} className={isSelected ? 'text-[var(--color-f1-red)]' : 'text-[var(--color-success)]'} />
+                                    ) : locked ? (
+                                        <Lock size={10} className={isSelected ? 'text-[var(--color-f1-red)]/60' : 'text-[var(--color-carbon-500)]'} />
+                                    ) : (
+                                        <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-[var(--color-f1-red)]' : 'bg-[var(--color-carbon-500)]'}`}></span>
+                                    )}
+                                </div>
                             </button>
                         );
                     })}
@@ -363,11 +414,10 @@ export default function BetsReportPage() {
                 )}
             </div>
         );
-    }
+    };
 
     return (
         <main className="min-h-screen pb-24">
-            {/* Header */}
             <header className="sticky top-0 z-40">
                 <div
                     className="px-5 py-4"
@@ -390,7 +440,6 @@ export default function BetsReportPage() {
                 </div>
             </header>
 
-            {/* Content */}
             <div className="px-5 pt-4">
                 <div className="flex gap-2 mb-2">
                     <button
