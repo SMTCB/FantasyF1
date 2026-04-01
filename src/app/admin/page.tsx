@@ -503,11 +503,10 @@ export default function AdminPage() {
             const errors = results.filter(r => r.error).map(r => r.error);
             if (errors.length > 0) {
                 console.error("Some scores failed to save:", errors);
-                toast.error(`Warning: ${errors.length} scores failed to save. Check console.`);
+                alert(`Warning: ${errors.length} scores failed to save. Check console.`);
             } else {
-                toast.success('Year-end scores successfully recalculated!');
+                alert('Year-end scores successfully recalculated!');
             }
-            handleSave("Year-end scores");
         } catch (e: any) {
             console.error(e);
             alert(`Error scoring year: ${e.message}`);
