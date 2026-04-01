@@ -193,8 +193,10 @@ export function scoreYearBet(bet: YearBet, result: YearResult): YearScore {
         const betValue = bet[betKey];
         const resultValue = result[betKey];
         if (betValue && resultValue) {
-            // Split comma-separated tied values and check if bet is among them
-            const tiedValues = resultValue.split(',').map(s => s.trim());
+            // Strip any "(Computed tie)" suffix and split comma-separated values
+            const cleanResult = resultValue.replace(/ \(Computed tie\)/g, '');
+            const tiedValues = cleanResult.split(',').map(s => s.trim());
+            
             if (tiedValues.includes(betValue)) {
                 const pts = YEAR_BET_SCORING[scoreKey];
                 breakdown[label] = pts;

@@ -216,8 +216,8 @@ export default function BetsReportPage() {
                                                     if (adminVal.includes(betVal)) {
                                                         const isFinal = yearResults.is_final;
                                                         stateColor = isFinal ? "text-[var(--color-success)]" : "text-[var(--color-warning)]";
-                                                        valColor = stateColor;
-                                                        bgState = isFinal ? "bg-[var(--color-success)]/10" : "bg-[var(--color-warning)]/10";
+                                                        valColor = "text-white font-bold";
+                                                        bgState = isFinal ? "bg-[var(--color-success)]/10" : "bg-[var(--color-warning)]/10 border-l border-[var(--color-warning)]/30";
                                                     } else {
                                                         stateColor = "text-[var(--color-danger)]";
                                                         valColor = stateColor;
@@ -231,7 +231,7 @@ export default function BetsReportPage() {
                                                         <span className={`${stateColor} w-32 truncate`}>{cat.label}:</span>
                                                         <span className={`font-semibold ${valColor} truncate flex-1`}>{betVal || '—'}</span>
                                                         {adminVal && betVal && adminVal.includes(betVal) && (
-                                                            <span className="text-[10px] font-mono text-[var(--color-carbon-400)] ml-2">
+                                                            <span className="text-[10px] font-mono text-white/90 ml-2 font-bold">
                                                                 +{YEAR_BET_SCORING[cat.scoreKey as keyof typeof YEAR_BET_SCORING]}
                                                             </span>
                                                         )}
