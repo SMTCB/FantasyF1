@@ -489,7 +489,7 @@ export default function AdminPage() {
                     .from('scores')
                     .insert({  // Using insert because we just deleted everything of this type
                         user_id: bet.user_id,
-                        round: 0,
+                        round: null, // Reverted to null to avoid FK constraint with races table (rounds 1-24)
                         score_type: 'year',
                         year_breakdown: breakdown,
                         total_points: total,
@@ -497,7 +497,16 @@ export default function AdminPage() {
                     });
             });
 
-            await Promise.all(scorePromises);
+            const results = await Promise.all(scorePromises);
+            
+            // Check for any errors in the batch results
+            const errors = results.filter(r => r.error).map(r => r.error);
+            if (errors.length > 0) {
+                console.error("Some scores failed to save:", errors);
+                toast.error(`Warning: ${errors.length} scores failed to save. Check console.`);
+            } else {
+                toast.success('Year-end scores successfully recalculated!');
+            }
             handleSave("Year-end scores");
         } catch (e: any) {
             console.error(e);
