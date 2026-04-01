@@ -20,20 +20,20 @@ import {
 } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { createClient } from '@/lib/supabase/client';
-import { CALENDAR, getNextRace, ALL_DRIVERS, TEAMS, RACE_BET_SCORING } from '@/lib/f1-data';
+import { CALENDAR, getNextRace, ALL_DRIVERS, TEAMS, RACE_BET_SCORING, YEAR_BET_SCORING } from '@/lib/f1-data';
 import { isBetLocked } from '@/lib/openf1';
 
 const YEAR_BET_CATEGORIES = [
-    { id: 'driver_champion', label: 'Driver Champion', icon: <Crown size={14} />, type: 'driver', dbKey: 'driver_champion' },
-    { id: 'driver_p2', label: 'Driver Runner-up', icon: <Medal size={14} />, type: 'driver', dbKey: 'driver_p2' },
-    { id: 'driver_p3', label: 'Driver P3', icon: <Medal size={14} />, type: 'driver', dbKey: 'driver_p3' },
-    { id: 'constructor_champion', label: 'Constructors Champion', icon: <Trophy size={14} />, type: 'constructor', dbKey: 'constructor_champion' },
-    { id: 'last_constructor', label: 'Last Place Constructor', icon: <AlertTriangle size={14} />, type: 'constructor', dbKey: 'last_constructor' },
-    { id: 'fewest_finishers', label: 'Race w/ Fewest Finishers', icon: <Skull size={14} />, type: 'race', dbKey: 'fewest_finishers_race' },
-    { id: 'most_dnfs', label: 'Most DNFs Driver', icon: <AlertTriangle size={14} />, type: 'driver', dbKey: 'most_dnfs_driver' },
-    { id: 'first_replaced', label: 'First Driver Replaced', icon: <UserX size={14} />, type: 'driver', dbKey: 'first_driver_replaced' },
-    { id: 'most_poles', label: 'Most Poles', icon: <Crosshair size={14} />, type: 'driver', dbKey: 'most_poles' },
-    { id: 'most_podiums_no_win', label: 'Most Podiums w/o Win', icon: <Award size={14} />, type: 'driver', dbKey: 'most_podiums_no_win' },
+    { id: 'driver_champion', label: 'Driver Champion', icon: <Crown size={14} />, type: 'driver', dbKey: 'driver_champion', scoreKey: 'DRIVER_CHAMPION' },
+    { id: 'driver_p2', label: 'Driver Runner-up', icon: <Medal size={14} />, type: 'driver', dbKey: 'driver_p2', scoreKey: 'DRIVER_P2' },
+    { id: 'driver_p3', label: 'Driver P3', icon: <Medal size={14} />, type: 'driver', dbKey: 'driver_p3', scoreKey: 'DRIVER_P3' },
+    { id: 'constructor_champion', label: 'Constructors Champion', icon: <Trophy size={14} />, type: 'driver', dbKey: 'constructor_champion', scoreKey: 'CONSTRUCTOR_CHAMPION' },
+    { id: 'last_constructor', label: 'Last Place Constructor', icon: <AlertTriangle size={14} />, type: 'driver', dbKey: 'last_constructor', scoreKey: 'LAST_CONSTRUCTOR' },
+    { id: 'fewest_finishers', label: 'Race w/ Fewest Finishers', icon: <Skull size={14} />, type: 'driver', dbKey: 'fewest_finishers_race', scoreKey: 'FEWEST_FINISHERS_RACE' },
+    { id: 'most_dnfs', label: 'Most DNFs Driver', icon: <AlertTriangle size={14} />, type: 'driver', dbKey: 'most_dnfs_driver', scoreKey: 'MOST_DNFS_DRIVER' },
+    { id: 'first_replaced', label: 'First Driver Replaced', icon: <UserX size={14} />, type: 'driver', dbKey: 'first_driver_replaced', scoreKey: 'FIRST_DRIVER_REPLACED' },
+    { id: 'most_poles', label: 'Most Poles', icon: <Crosshair size={14} />, type: 'driver', dbKey: 'most_poles', scoreKey: 'MOST_POLES' },
+    { id: 'most_podiums_no_win', label: 'Most Podiums w/o Win', icon: <Award size={14} />, type: 'driver', dbKey: 'most_podiums_no_win', scoreKey: 'MOST_PODIUMS_NO_WIN' },
 ];
 
 export default function BetsReportPage() {
@@ -229,7 +229,12 @@ export default function BetsReportPage() {
                                                     <div key={cat.id} className={`flex items-center gap-2 text-xs py-1.5 px-2 -mx-2 rounded-sm transition-colors ${bgState}`}>
                                                         <span className={`${stateColor} w-5 flex justify-center`}>{cat.icon}</span>
                                                         <span className={`${stateColor} w-32 truncate`}>{cat.label}:</span>
-                                                        <span className={`font-semibold ${valColor} truncate`}>{betVal || '—'}</span>
+                                                        <span className={`font-semibold ${valColor} truncate flex-1`}>{betVal || '—'}</span>
+                                                        {adminVal && betVal && adminVal.includes(betVal) && (
+                                                            <span className="text-[10px] font-mono text-[var(--color-carbon-400)] ml-2">
+                                                                +{YEAR_BET_SCORING[cat.scoreKey as keyof typeof YEAR_BET_SCORING]}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 );
                                             })}
