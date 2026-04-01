@@ -445,9 +445,29 @@ export default function AdminPage() {
             // This ensures uniqueness because round: null in a UNIQUE constraint doesn't prevent multiple entries in Postgres
             await supabase.from('scores').delete().eq('score_type', 'year');
 
-            const yearResult = yearResultsForm as YearResult;
+            // 4. Fetch the source of truth for year results directly from DB
+            const { data: yearData, error: yDataError } = await supabase
+                .from('year_results')
+                .select('*')
+                .eq('season', 2026)
+                .single();
 
-            // 4. Score each bet using the official scoring engine
+            if (yDataError) throw yDataError;
+
+            const yearResult: YearResult = {
+                driverChampion: yearData.driver_champion || '',
+                driverP2: yearData.driver_p2 || '',
+                driverP3: yearData.driver_p3 || '',
+                constructorChampion: yearData.constructor_champion || '',
+                lastConstructor: yearData.last_constructor || '',
+                fewestFinishersRace: yearData.fewest_finishers_race || '',
+                mostDnfsDriver: yearData.most_dnfs_driver || '',
+                firstDriverReplaced: yearData.first_driver_replaced || '',
+                mostPoles: yearData.most_poles || '',
+                mostPodiumsNoWin: yearData.most_podiums_no_win || '',
+            };
+
+            // 5. Score each bet using the official scoring engine
             const scorePromises = (bets || []).map(async (bet) => {
                 // Map snake_case DB columns to camelCase expected by scoreYearBet
                 const mappedBet: YearBet = {
