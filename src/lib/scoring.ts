@@ -168,7 +168,6 @@ export function scoreYearBet(bet: YearBet, result: YearResult): YearScore {
         ['Driver P3', 'driverP3', 'DRIVER_P3'],
         ['Constructor Champion', 'constructorChampion', 'CONSTRUCTOR_CHAMPION'],
         ['Last Constructor', 'lastConstructor', 'LAST_CONSTRUCTOR'],
-        ['Fewest Finishers Race', 'fewestFinishersRace', 'FEWEST_FINISHERS_RACE'],
         ['First Driver Replaced', 'firstDriverReplaced', 'FIRST_DRIVER_REPLACED'],
     ];
 
@@ -187,6 +186,7 @@ export function scoreYearBet(bet: YearBet, result: YearResult): YearScore {
         ['Most DNFs Driver', 'mostDnfsDriver', 'MOST_DNFS_DRIVER'],
         ['Most Poles', 'mostPoles', 'MOST_POLES'],
         ['Most Podiums No Win', 'mostPodiumsNoWin', 'MOST_PODIUMS_NO_WIN'],
+        ['Fewest Finishers Race', 'fewestFinishersRace', 'FEWEST_FINISHERS_RACE'],
     ];
 
     tieChecks.forEach(([label, betKey, scoreKey]) => {

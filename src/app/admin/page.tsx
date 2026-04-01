@@ -441,41 +441,39 @@ export default function AdminPage() {
 
             if (betsError) throw betsError;
 
+            // 3. Clean up any existing year scores (especially old ones with round: null that cause duplicates)
+            // This ensures uniqueness because round: null in a UNIQUE constraint doesn't prevent multiple entries in Postgres
+            await supabase.from('scores').delete().eq('score_type', 'year');
+
             const yearResult = yearResultsForm as YearResult;
 
-            // 3. Score each bet
+            // 4. Score each bet using the official scoring engine
             const scorePromises = (bets || []).map(async (bet) => {
-                let pts = 0;
-                const checkMatch = (betVal: string | null, formVal: string | undefined) => {
-                    if (!betVal || !formVal) return false;
-                    const answers = formVal.replace(/ \(Computed tie\)/g, '').split(',').map(s => s.trim());
-                    return answers.includes(betVal);
+                // Map snake_case DB columns to camelCase expected by scoreYearBet
+                const mappedBet: YearBet = {
+                    driverChampion: bet.driver_champion || '',
+                    driverP2: bet.driver_p2 || '',
+                    driverP3: bet.driver_p3 || '',
+                    constructorChampion: bet.constructor_champion || '',
+                    lastConstructor: bet.last_constructor || '',
+                    fewestFinishersRace: bet.fewest_finishers_race || '',
+                    mostDnfsDriver: bet.most_dnfs_driver || '',
+                    firstDriverReplaced: bet.first_driver_replaced || '',
+                    mostPoles: bet.most_poles || '',
+                    mostPodiumsNoWin: bet.most_podiums_no_win || '',
                 };
 
-                if (checkMatch(bet.driver_champion, yearResultsForm.driverChampion)) pts += YEAR_BET_SCORING.DRIVER_CHAMPION;
-                if (checkMatch(bet.driver_p2, yearResultsForm.driverP2)) pts += YEAR_BET_SCORING.DRIVER_P2;
-                if (checkMatch(bet.driver_p3, yearResultsForm.driverP3)) pts += YEAR_BET_SCORING.DRIVER_P3;
-
-                if (checkMatch(bet.constructor_champion, yearResultsForm.constructorChampion)) pts += YEAR_BET_SCORING.CONSTRUCTOR_CHAMPION;
-                if (checkMatch(bet.last_constructor, yearResultsForm.lastConstructor)) pts += YEAR_BET_SCORING.LAST_CONSTRUCTOR;
-
-                if (checkMatch(bet.fewest_finishers_race, yearResultsForm.fewestFinishersRace)) pts += YEAR_BET_SCORING.FEWEST_FINISHERS_RACE;
-                if (checkMatch(bet.most_dnfs_driver, yearResultsForm.mostDnfsDriver)) pts += YEAR_BET_SCORING.MOST_DNFS_DRIVER;
-                if (checkMatch(bet.first_driver_replaced, yearResultsForm.firstDriverReplaced)) pts += YEAR_BET_SCORING.FIRST_DRIVER_REPLACED;
-                if (checkMatch(bet.most_poles, yearResultsForm.mostPoles)) pts += YEAR_BET_SCORING.MOST_POLES;
-                if (checkMatch(bet.most_podiums_no_win, yearResultsForm.mostPodiumsNoWin)) pts += YEAR_BET_SCORING.MOST_PODIUMS_NO_WIN;
+                const { breakdown, total } = scoreYearBet(mappedBet, yearResult);
 
                 return supabase
                     .from('scores')
-                    .upsert({
+                    .insert({  // Using insert because we just deleted everything of this type
                         user_id: bet.user_id,
-                        round: null, // Year scores have null round usually or handled by type
+                        round: 0,
                         score_type: 'year',
-                        year_breakdown: { total: pts },
-                        total_points: pts,
+                        year_breakdown: breakdown,
+                        total_points: total,
                         scored_at: new Date().toISOString()
-                    }, {
-                        onConflict: 'user_id, round, score_type'
                     });
             });
 
