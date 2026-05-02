@@ -29,9 +29,11 @@ export async function GET(request: NextRequest) {
 
     let sessionStart = dbRace?.session_start;
 
-    // 2. Fallback to OpenF1 API directly if DB is missing time
+    // 2. Fallback to OpenF1 API directly if DB is missing time.
+    //    Pass the calendar date so that countries hosting multiple GPs
+    //    (Spain, United States) resolve to the correct session.
     if (!sessionStart) {
-        const session = await fetchRaceSession(2026, country);
+        const session = await fetchRaceSession(2026, country, race.date);
         if (session) {
             sessionStart = session.date_start;
         }

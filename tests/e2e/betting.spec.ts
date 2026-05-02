@@ -11,84 +11,86 @@ test.describe('Betting Logic & Admin Overrides', () => {
         await expect(page).toHaveURL('/');
     });
 
-    test('Sequential Betting: Future races are locked by default', async ({ page }) => {
+    test('Round 4 is Miami GP — not Bahrain', async ({ page }) => {
+        // After migration 004 the calendar no longer contains Bahrain or Saudi.
+        // Round 4 must be Miami GP.
         await page.goto('/bets/race');
-
-        // Round 4 (Bahrain GP) should be locked on Mar 6, 2026
-        const round4 = page.locator('text=Bahrain GP');
-        const round4Status = page.locator('div:has-text("Bahrain GP") >> span:has-text("LOCKED")');
-        await expect(round4Status).toBeVisible();
-
-        // Attempt to go to Round 4 page and verify it's locked there too
-        await page.goto('/bets/race/4');
-        const lockStatus = page.locator('span:has-text("LOCKED")');
-        await expect(lockStatus).toBeVisible();
-        const submitBtn = page.locator('button:has-text("BETS LOCKED")');
-        await expect(submitBtn).toBeDisabled();
+        await expect(page.locator('text=Miami GP')).toBeVisible();
+        await expect(page.locator('text=Bahrain GP')).not.toBeVisible();
+        await expect(page.locator('text=Saudi Arabian GP')).not.toBeVisible();
     });
 
-    test('Admin Override: Forced Open allows betting on future races', async ({ page }) => {
-        // 1. Go to Admin and Force Open Round 4
+    test('Sequential Betting: Round 4 (Miami GP) is open the day before the race', async ({ page }) => {
+        // Today is 2026-05-02. Miami race is 2026-05-03. Bets must be open.
+        await page.goto('/bets/race/4');
+        const title = page.locator('h1, h2, [class*="font-display"]').filter({ hasText: /Miami/i });
+        await expect(title.first()).toBeVisible();
+
+        // The submit button must NOT show "BETS LOCKED"
+        const lockedBtn = page.locator('button:has-text("BETS LOCKED")');
+        await expect(lockedBtn).not.toBeVisible();
+    });
+
+    test('Admin Override: Forced Open allows betting on a race', async ({ page }) => {
+        // 1. Go to Admin and Force Open Round 4 (Miami GP)
         await page.goto('/admin');
 
         // Enter Admin PIN
         await page.fill('input[type="password"]', '2026');
-        await page.click('button:has-text("ACCESS PANEL")');
+        await page.click('button:has-text("AUTHENTICATE")');
 
-        // Expand Round 4
-        const round4Header = page.locator('button:has-text("Bahrain GP")');
+        // Expand Miami GP (Round 4)
+        const round4Header = page.locator('button').filter({ hasText: /Miami GP/ });
         await round4Header.click();
 
-        // Find Round 4 in the list and toggle unlock
-        const toggleBtn = page.locator('div:has-text("Bahrain GP")').locator('button', { hasText: /AUTO-LOCK|FORCED OPEN/ }).last();
+        // Find the lock toggle inside the expanded section
+        const toggleBtn = page.locator('div').filter({ hasText: /Miami GP/ })
+            .locator('button').filter({ hasText: /AUTO-LOCK|FORCED OPEN/ }).last();
 
-        // Ensure we are toggling to FORCED OPEN
         const currentText = await toggleBtn.innerText();
         if (currentText.includes('AUTO-LOCK')) {
             await toggleBtn.click();
         }
 
-        // Verify status changed in Admin
-        await expect(page.locator('div:has-text("Bahrain GP")').locator('span:has-text("FORCED OPEN")')).toBeVisible();
+        // Verify FORCED OPEN state in Admin
+        await expect(
+            page.locator('div').filter({ hasText: /Miami GP/ }).locator('button').filter({ hasText: 'FORCED OPEN' }).last()
+        ).toBeVisible();
 
-        // 2. Go to Round 4 bet page and verify it's open
+        // 2. Verify the bet page reflects the forced-open state
         await page.goto('/bets/race/4');
-        const openStatus = page.locator('span:has-text("FORCED OPEN")');
+        const openStatus = page.locator('text=FORCED OPEN');
         await expect(openStatus).toBeVisible();
 
         // 3. Cleanup: Set it back to AUTO-LOCK
         await page.goto('/admin');
         await page.fill('input[type="password"]', '2026');
-        await page.click('button:has-text("ACCESS PANEL")');
+        await page.click('button:has-text("AUTHENTICATE")');
         await round4Header.click();
-        const toggleBtnBack = page.locator('div:has-text("Bahrain GP")').locator('button:has-text("FORCED OPEN")');
+        const toggleBtnBack = page.locator('div').filter({ hasText: /Miami GP/ })
+            .locator('button').filter({ hasText: 'FORCED OPEN' }).last();
         await toggleBtnBack.click();
     });
 
     test('Upsert Logic: Users can update bets multiple times', async ({ page }) => {
-        // We'll use Round 1 as it should be open
+        // Use Round 1 (Australian GP — always open for testing)
         await page.goto('/bets/race/1');
 
-        // Helper to select driver in the list (not in header)
         const selectDriver = async (name: string) => {
             await page.locator('.space-y-2.max-h-\\[400px\\]').locator(`text=${name}`).first().click();
         };
 
-        // Fill some podiums
-        await selectDriver('Max Verstappen'); // P1
-        await selectDriver('Charles Leclerc'); // P2
-        await selectDriver('Lewis Hamilton'); // P3
+        // Fill podiums
+        await selectDriver('Max Verstappen');
+        await selectDriver('Charles Leclerc');
+        await selectDriver('Lewis Hamilton');
 
         // Fill Extras
         await page.click('button:has-text("EXTRAS")');
 
-        // DNF driver - find in the DNF grid
         await page.locator('div:has-text("DNF Prediction") + div').locator('text=Lando Norris').first().click();
-
-        // Team most points
         await page.locator('div:has-text("Team with Most Points") + div').locator('text=McLaren').first().click();
 
-        // Special category
         const specialGrid = page.locator('div:has-text("SPECIAL CATEGORY")').locator('..').locator('..');
         const firstOption = specialGrid.locator('button, .data-readout').first();
         if (await firstOption.isVisible()) {
@@ -97,23 +99,22 @@ test.describe('Betting Logic & Admin Overrides', () => {
 
         // Submit first time
         await page.click('button:has-text("LOCK IN RACE BETS")');
-
-        // Check for success - simplified check since we might navigate
         await expect(page.locator('text=Bets Submitted!')).toBeVisible({ timeout: 15000 });
 
-        // Go back and change something
+        // Go back and change P1
         await page.goto('/bets/race/1');
         await page.click('button:has-text("PODIUM")');
 
-        // Deselect P1 (Max) and select Lando
-        await selectDriver('Max Verstappen'); // Deselects P1
-        await selectDriver('Lando Norris');   // Selects P1
+        await selectDriver('Max Verstappen'); // Deselect
+        await selectDriver('Lando Norris');   // New P1
 
         await page.click('button:has-text("LOCK IN RACE BETS")');
         await expect(page.locator('text=Bets Submitted!')).toBeVisible({ timeout: 15000 });
 
-        // Refresh and check if P1 is Lando Norris
+        // Verify P1 persisted
         await page.goto('/bets/race/1');
-        await expect(page.locator('.telemetry-border:has-text("P1")').locator('text=Lando Norris')).toBeVisible();
+        await expect(
+            page.locator('.telemetry-border:has-text("P1")').locator('text=Lando Norris')
+        ).toBeVisible();
     });
 });

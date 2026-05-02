@@ -137,6 +137,14 @@ export default function AdminPage() {
     // Track which round last triggered a year stats computation
     const [prelimRound, setPrelimRound] = useState<number | null>(null);
 
+    // Score Override state
+    const [users, setUsers] = useState<{ id: string; display_name: string }[]>([]);
+    const [overrideUserId, setOverrideUserId] = useState('');
+    const [overrideRound, setOverrideRound] = useState<number | ''>('');
+    const [overrideScore, setOverrideScore] = useState('');
+    const [overrideReason, setOverrideReason] = useState('');
+    const [isApplyingOverride, setIsApplyingOverride] = useState(false);
+
     const supabase = createClient();
 
     // Fetch year lock status and manual race unlocks
@@ -202,7 +210,52 @@ export default function AdminPage() {
         };
         fetchData();
     }, [supabase]);
-    // Simple PIN auth for admin
+
+    useEffect(() => {
+        supabase.from('profiles').select('id, display_name').then(({ data }) => {
+            if (data) setUsers(data);
+        });
+    }, [supabase]);
+
+    const handleApplyOverride = async () => {
+        if (!overrideUserId || overrideRound === '' || overrideScore === '' || !overrideReason.trim()) {
+            alert('Please fill all fields: user, race, new score, and reason.');
+            return;
+        }
+        const score = parseInt(overrideScore, 10);
+        if (isNaN(score)) {
+            alert('Score must be a number.');
+            return;
+        }
+
+        setIsApplyingOverride(true);
+        try {
+            const { error } = await supabase
+                .from('scores')
+                .upsert({
+                    user_id: overrideUserId,
+                    round: overrideRound,
+                    score_type: 'race',
+                    total_points: score,
+                    is_override: true,
+                    override_reason: overrideReason.trim(),
+                    scored_at: new Date().toISOString(),
+                }, { onConflict: 'user_id, round, score_type' });
+
+            if (error) throw error;
+
+            setOverrideUserId('');
+            setOverrideRound('');
+            setOverrideScore('');
+            setOverrideReason('');
+            handleSave(`Score override for round ${overrideRound}`);
+        } catch (e: any) {
+            console.error(e);
+            alert(`Override failed: ${e.message}`);
+        } finally {
+            setIsApplyingOverride(false);
+        }
+    };
 
     // Simple PIN auth for admin
     const handleAuth = () => {
@@ -978,24 +1031,34 @@ export default function AdminPage() {
                             exit={{ opacity: 0 }}
                         >
                             <p className="text-xs text-[var(--color-carbon-400)] mb-4">
-                                Override individual user scores for any race. Changes are logged.
+                                Override a user&apos;s total score for a specific race. The override replaces the calculated score and is flagged in the database with your reason.
                             </p>
-                            <div className="glass-card p-6 text-center">
-                                <Zap size={32} className="text-[var(--color-warning)] mx-auto mb-3" />
-                                <h3 className="font-bold mb-2">Score Override</h3>
-                                <p className="text-sm text-[var(--color-carbon-400)] mb-4">
-                                    Select a user and race to manually adjust their score.
-                                </p>
+                            <div className="glass-card p-6">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <Zap size={18} className="text-[var(--color-warning)]" />
+                                    <h3 className="font-bold text-sm">Score Override</h3>
+                                </div>
                                 <div className="space-y-3">
                                     <div>
                                         <label className="data-readout text-[9px] block mb-1">USER</label>
-                                        <select className="input-field text-sm">
+                                        <select
+                                            value={overrideUserId}
+                                            onChange={(e) => setOverrideUserId(e.target.value)}
+                                            className="input-field text-sm"
+                                        >
                                             <option value="">Select user...</option>
+                                            {users.map(u => (
+                                                <option key={u.id} value={u.id}>{u.display_name}</option>
+                                            ))}
                                         </select>
                                     </div>
                                     <div>
                                         <label className="data-readout text-[9px] block mb-1">RACE</label>
-                                        <select className="input-field text-sm">
+                                        <select
+                                            value={overrideRound}
+                                            onChange={(e) => setOverrideRound(e.target.value ? Number(e.target.value) : '')}
+                                            className="input-field text-sm"
+                                        >
                                             <option value="">Select race...</option>
                                             {CALENDAR.map((r) => (
                                                 <option key={r.round} value={r.round}>R{r.round} - {r.gp}</option>
@@ -1004,14 +1067,33 @@ export default function AdminPage() {
                                     </div>
                                     <div>
                                         <label className="data-readout text-[9px] block mb-1">NEW TOTAL SCORE</label>
-                                        <input type="number" placeholder="Enter score..." className="input-field text-sm" />
+                                        <input
+                                            type="number"
+                                            placeholder="Enter score..."
+                                            value={overrideScore}
+                                            onChange={(e) => setOverrideScore(e.target.value)}
+                                            className="input-field text-sm"
+                                        />
                                     </div>
                                     <div>
                                         <label className="data-readout text-[9px] block mb-1">REASON</label>
-                                        <input type="text" placeholder="Reason for override..." className="input-field text-sm" />
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. Stewards reversal, data error..."
+                                            value={overrideReason}
+                                            onChange={(e) => setOverrideReason(e.target.value)}
+                                            className="input-field text-sm"
+                                        />
                                     </div>
-                                    <button className="btn-primary w-full text-xs py-2.5 flex items-center justify-center gap-1.5">
-                                        <Save size={12} />
+                                    <button
+                                        onClick={handleApplyOverride}
+                                        disabled={isApplyingOverride}
+                                        className="btn-primary w-full text-xs py-2.5 flex items-center justify-center gap-1.5"
+                                    >
+                                        {isApplyingOverride
+                                            ? <Loader2 size={12} className="animate-spin" />
+                                            : <Save size={12} />
+                                        }
                                         APPLY OVERRIDE
                                     </button>
                                 </div>
