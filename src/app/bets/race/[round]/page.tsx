@@ -313,8 +313,8 @@ export default function RaceBetPage() {
                                 </div>
                             )}
 
-                            {/* Qualifying Results Section */}
-                            <div className="mb-4">
+                            {/* Qualifying Results Section — only shown once qualifying data is available */}
+                            <div className="mb-4" style={{ display: !loadingQualy && qualifyingResults.length === 0 ? 'none' : undefined }}>
                                 <button
                                     onClick={() => setShowQualifying(!showQualifying)}
                                     className="flex items-center gap-2 w-full p-2 bg-[var(--color-carbon-800)]/50 border border-[var(--color-carbon-700)] rounded-lg text-xs font-medium hover:border-[var(--color-carbon-500)] transition-all"
@@ -348,7 +348,7 @@ export default function RaceBetPage() {
                                                                     {res.position}
                                                                 </span>
                                                                 <span className="flex-1 font-medium">{res.driverName}</span>
-                                                                <span className="text-[9px] text-[var(--color-carbon-500)] uppercase font-mono">{res.teamName}</span>
+                                                                <span className="text-[9px] text-[var(--color-carbon-300)] uppercase font-mono">{res.teamName}</span>
                                                             </div>
                                                         ))}
                                                     </div>

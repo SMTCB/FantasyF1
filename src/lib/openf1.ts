@@ -53,15 +53,31 @@ export async function fetchRaceSession(
 
 /**
  * Fetch the Qualifying session for a given meeting (round).
+ * Pass `nearDate` (YYYY-MM-DD) to disambiguate countries that host multiple GPs.
  */
-export async function fetchQualifyingSession(year: number, countryName: string): Promise<SessionInfo | null> {
+export async function fetchQualifyingSession(
+    year: number,
+    countryName: string,
+    nearDate?: string,
+): Promise<SessionInfo | null> {
     try {
         const res = await fetchWithRetry(
             `${OPENF1_BASE}/sessions?year=${year}&country_name=${encodeURIComponent(countryName)}&session_type=Qualifying`
         );
         if (!res.ok) return null;
         const data: SessionInfo[] = await res.json();
-        return data[0] || null;
+        if (!data || data.length === 0) return null;
+
+        if (nearDate && data.length > 1) {
+            const target = new Date(nearDate).getTime();
+            return data.reduce((best, s) => {
+                const diff = Math.abs(new Date(s.date_start).getTime() - target);
+                const bestDiff = Math.abs(new Date(best.date_start).getTime() - target);
+                return diff < bestDiff ? s : best;
+            });
+        }
+
+        return data[0];
     } catch {
         return null;
     }

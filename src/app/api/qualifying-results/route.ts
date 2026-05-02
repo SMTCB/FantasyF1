@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchQualifyingSession, fetchSessionResult, fetchDrivers } from '@/lib/openf1';
-import { ROUND_TO_COUNTRY } from '@/lib/f1-data';
+import { ROUND_TO_COUNTRY, CALENDAR } from '@/lib/f1-data';
 
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
@@ -15,9 +15,11 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Country mapping not found' }, { status: 404 });
     }
 
+    const race = CALENDAR.find(r => r.round === round);
+
     try {
-        // 1. Get Qualifying Session Key
-        const session = await fetchQualifyingSession(2026, country);
+        // 1. Get Qualifying Session Key — pass race date for multi-GP country disambiguation
+        const session = await fetchQualifyingSession(2026, country, race?.date);
         if (!session) {
             return NextResponse.json({
                 results: [],
