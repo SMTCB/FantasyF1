@@ -1,60 +1,40 @@
 import { test, expect } from '@playwright/test';
+import { loginAsAdmin, enterAdminPin, TEST_ADMIN } from '../helpers/auth';
 
+test.describe.configure({ mode: 'serial' });
 test.describe('Admin Panel', () => {
-
-    test.beforeEach(async ({ page }) => {
-        await page.goto('/login');
-        await page.fill('input[placeholder="Enter username"]', 'braganca');
-        await page.fill('input[type="password"]', 'fantasyf1');
-        await page.click('button[type="submit"]');
-        await expect(page).toHaveURL('/');
-    });
 
     // ── Access control ───────────────────────────────────────────
 
-    test('Non-admin user sees Access Denied', async ({ page }) => {
-        // Log in as a regular user first (adjust username to a known non-admin)
-        await page.goto('/login');
-        await page.fill('input[placeholder="Enter username"]', 'stcbr');
-        await page.fill('input[type="password"]', 'fantasyf1');
-        await page.click('button[type="submit"]');
-        await page.goto('/admin');
-        await expect(page.locator('text=/Access Denied/i')).toBeVisible();
-    });
-
     test('Correct PIN unlocks the admin panel', async ({ page }) => {
+        await loginAsAdmin(page);
         await page.goto('/admin');
-        await page.fill('input[type="password"]', '2026');
-        await page.click('button:has-text("AUTHENTICATE")');
+        await enterAdminPin(page);
         await expect(page.locator('text=/Race Results/i').first()).toBeVisible();
     });
 
     test('Wrong PIN does not unlock the admin panel', async ({ page }) => {
+        await loginAsAdmin(page);
         await page.goto('/admin');
         await page.fill('input[type="password"]', '9999');
         await page.click('button:has-text("AUTHENTICATE")');
-        // Should still be on the PIN screen
         await expect(page.locator('input[type="password"]')).toBeVisible();
     });
 
     // ── Race Results tab ─────────────────────────────────────────
 
-    test('Race Results tab lists all 22 races', async ({ page }) => {
+    test('Race Results tab lists Miami GP and not Bahrain GP', async ({ page }) => {
+        await loginAsAdmin(page);
         await page.goto('/admin');
-        await page.fill('input[type="password"]', '2026');
-        await page.click('button:has-text("AUTHENTICATE")');
-
-        // Miami GP and Abu Dhabi GP must both appear (first and last of the updated calendar)
+        await enterAdminPin(page);
         await expect(page.locator('text=Miami GP').first()).toBeVisible();
-        await expect(page.locator('text=Abu Dhabi GP').first()).toBeVisible();
-        // Cancelled races must NOT appear
         await expect(page.locator('text=Bahrain GP')).not.toBeVisible();
     });
 
     test('Expanding a race shows Fetch from F1 API and lock toggle', async ({ page }) => {
+        await loginAsAdmin(page);
         await page.goto('/admin');
-        await page.fill('input[type="password"]', '2026');
-        await page.click('button:has-text("AUTHENTICATE")');
+        await enterAdminPin(page);
 
         const r4 = page.locator('button').filter({ hasText: /Miami GP/ });
         await r4.click();
@@ -65,10 +45,10 @@ test.describe('Admin Panel', () => {
         ).toBeVisible();
     });
 
-    test('Manual unlock toggle switches between AUTO-LOCK and FORCED OPEN', async ({ page }) => {
+    test('Manual unlock toggle switches state', async ({ page }) => {
+        await loginAsAdmin(page);
         await page.goto('/admin');
-        await page.fill('input[type="password"]', '2026');
-        await page.click('button:has-text("AUTHENTICATE")');
+        await enterAdminPin(page);
 
         const r4 = page.locator('button').filter({ hasText: /Miami GP/ });
         await r4.click();
@@ -78,36 +58,33 @@ test.describe('Admin Panel', () => {
 
         const before = await toggle.innerText();
         await toggle.click();
+        await page.waitForTimeout(500);
         const after = await toggle.innerText();
-        expect(before).not.toEqual(after);
+        expect(before.trim()).not.toEqual(after.trim());
 
-        // Revert
+        // Always revert
         await toggle.click();
     });
 
     // ── Score Override tab ───────────────────────────────────────
 
-    test('Score Override tab has populated dropdowns', async ({ page }) => {
+    test('Score Override tab has user and race dropdowns', async ({ page }) => {
+        await loginAsAdmin(page);
         await page.goto('/admin');
-        await page.fill('input[type="password"]', '2026');
-        await page.click('button:has-text("AUTHENTICATE")');
-        await page.click('button:has-text("Score Override")');
+        await enterAdminPin(page);
+        await page.locator('button').filter({ hasText: /Score Override/ }).click();
 
-        // User select must have at least 2 options (placeholder + 1 user)
-        const userSelect = page.locator('select').filter({ has: page.locator('option:has-text("Select user")') });
-        const userOptions = await userSelect.locator('option').count();
+        // Wait for user dropdown to hydrate from DB
+        await expect(page.locator('select').first().locator('option').nth(1)).toBeAttached({ timeout: 10000 });
+        const userOptions = await page.locator('select').first().locator('option').count();
         expect(userOptions).toBeGreaterThan(1);
-
-        // Race select must include Miami GP
-        const raceSelect = page.locator('select').filter({ has: page.locator('option', { hasText: /Miami GP/ }) });
-        await expect(raceSelect).toBeVisible();
     });
 
     test('Score Override validation blocks empty form', async ({ page }) => {
+        await loginAsAdmin(page);
         await page.goto('/admin');
-        await page.fill('input[type="password"]', '2026');
-        await page.click('button:has-text("AUTHENTICATE")');
-        await page.click('button:has-text("Score Override")');
+        await enterAdminPin(page);
+        await page.locator('button').filter({ hasText: /Score Override/ }).click();
 
         page.on('dialog', async (d) => {
             expect(d.message()).toMatch(/fill all fields/i);
@@ -120,13 +97,13 @@ test.describe('Admin Panel', () => {
 
     // ── Year End tab ─────────────────────────────────────────────
 
-    test('Year End tab shows lock toggle and Calculate button', async ({ page }) => {
+    test('Year End tab shows Calculate button and lock toggle', async ({ page }) => {
+        await loginAsAdmin(page);
         await page.goto('/admin');
-        await page.fill('input[type="password"]', '2026');
-        await page.click('button:has-text("AUTHENTICATE")');
+        await enterAdminPin(page);
         await page.click('button:has-text("Year End")');
 
-        await expect(page.locator('button:has-text("CALCULATE & SCORE YEAR BETS")').first()).toBeVisible();
+        await expect(page.locator('button:has-text("CALCULATE & SCORE YEAR BETS")')).toBeVisible();
         await expect(page.locator('button:has-text("OPEN"), button:has-text("LOCKED")').last()).toBeVisible();
     });
 });

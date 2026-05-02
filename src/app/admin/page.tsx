@@ -155,7 +155,12 @@ export default function AdminPage() {
             if (user) {
                 const username = user.email?.split('@')[0].toLowerCase();
                 setCurrentUser(username || null);
-                setIsAuthorized(username === 'segismundob');
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('is_admin')
+                    .eq('id', user.id)
+                    .single();
+                setIsAuthorized(profile?.is_admin === true);
             } else {
                 setIsAuthorized(false);
             }
@@ -264,6 +269,14 @@ export default function AdminPage() {
         }
     };
 
+    if (isAuthorized === null) {
+        return (
+            <main className="min-h-screen flex items-center justify-center pb-24">
+                <div className="w-6 h-6 border-2 border-[var(--color-f1-red)]/30 border-t-[var(--color-f1-red)] rounded-full animate-spin" />
+            </main>
+        );
+    }
+
     if (isAuthorized === false) {
         return (
             <main className="min-h-screen flex items-center justify-center pb-24">
@@ -277,7 +290,7 @@ export default function AdminPage() {
                     </div>
                     <h2 className="text-xl font-bold mb-2">Access Denied</h2>
                     <p className="text-sm text-[var(--color-carbon-400)]">
-                        Only the lead administrator (SegismundoB) can access this telemetry panel.
+                        Only administrators can access this panel.
                     </p>
                 </motion.div>
                 <BottomNav />
