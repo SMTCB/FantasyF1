@@ -16,14 +16,40 @@ export interface SessionInfo {
     year: number;
 }
 
-export async function fetchRaceSession(year: number, countryName: string): Promise<SessionInfo | null> {
+/**
+ * Fetch the Race session for a given year and country.
+ * Pass `nearDate` (YYYY-MM-DD) to disambiguate countries that host multiple
+ * GPs in the same season (e.g. Spain hosts Barcelona and Madrid; the USA
+ * hosts Miami, COTA, and Las Vegas). The session whose date_start is closest
+ * to `nearDate` is returned.
+ */
+export async function fetchRaceSession(
+    year: number,
+    countryName: string,
+    nearDate?: string,
+): Promise<SessionInfo | null> {
     try {
         const res = await fetchWithRetry(
             `${OPENF1_BASE}/sessions?year=${year}&country_name=${encodeURIComponent(countryName)}&session_type=Race`
         );
         if (!res.ok) return null;
         const data: SessionInfo[] = await res.json();
-        return data.find((s: SessionInfo) => s.session_name === 'Race') || data[0] || null;
+        if (!data || data.length === 0) return null;
+
+        // Always prefer the Grand Prix race over Sprint Race
+        const gpSessions = data.filter((s: SessionInfo) => s.session_name === 'Race');
+        const candidates = gpSessions.length > 0 ? gpSessions : data;
+
+        if (nearDate && candidates.length > 1) {
+            const target = new Date(nearDate).getTime();
+            return candidates.reduce((best, s) => {
+                const diff = Math.abs(new Date(s.date_start).getTime() - target);
+                const bestDiff = Math.abs(new Date(best.date_start).getTime() - target);
+                return diff < bestDiff ? s : best;
+            });
+        }
+
+        return candidates[0];
     } catch {
         return null;
     }
@@ -31,15 +57,35 @@ export async function fetchRaceSession(year: number, countryName: string): Promi
 
 /**
  * Fetch the Qualifying session for a given meeting (round).
+ * Pass `nearDate` (YYYY-MM-DD) to disambiguate countries that host multiple GPs.
  */
-export async function fetchQualifyingSession(year: number, countryName: string): Promise<SessionInfo | null> {
+export async function fetchQualifyingSession(
+    year: number,
+    countryName: string,
+    nearDate?: string,
+): Promise<SessionInfo | null> {
     try {
         const res = await fetchWithRetry(
             `${OPENF1_BASE}/sessions?year=${year}&country_name=${encodeURIComponent(countryName)}&session_type=Qualifying`
         );
         if (!res.ok) return null;
         const data: SessionInfo[] = await res.json();
-        return data[0] || null;
+        if (!data || data.length === 0) return null;
+
+        // Prefer the Grand Prix qualifying over Sprint Qualifying
+        const qualSessions = data.filter((s: SessionInfo) => s.session_name === 'Qualifying');
+        const candidates = qualSessions.length > 0 ? qualSessions : data;
+
+        if (nearDate && candidates.length > 1) {
+            const target = new Date(nearDate).getTime();
+            return candidates.reduce((best, s) => {
+                const diff = Math.abs(new Date(s.date_start).getTime() - target);
+                const bestDiff = Math.abs(new Date(best.date_start).getTime() - target);
+                return diff < bestDiff ? s : best;
+            });
+        }
+
+        return candidates[0];
     } catch {
         return null;
     }

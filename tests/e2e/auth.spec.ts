@@ -1,33 +1,30 @@
 import { test, expect } from '@playwright/test';
+import { loginAsAdmin, TEST_ADMIN } from '../helpers/auth';
 
-test.describe('Authentication Flow', () => {
+test.describe('Authentication', () => {
 
-    test('Redirects unauthenticated users to login', async ({ page }) => {
-        // Attempting to visit dashboard
+    test('Unauthenticated users are redirected to /login', async ({ page }) => {
         await page.goto('/');
-
-        // Should immediately land on login due to middleware
-        await expect(page).toHaveURL(/.*\/login/);
-
-        // Check for login UI
-        await expect(page.locator('h1').first()).toContainText('PADDOCK');
+        await expect(page).toHaveURL(/\/login/);
         await expect(page.locator('button[type="submit"]')).toBeVisible();
     });
 
-    test('Shows error for invalid credentials', async ({ page }) => {
+    test('Invalid credentials show an error', async ({ page }) => {
         await page.goto('/login');
-
-        // Fill in bogus details
-        await page.fill('input[placeholder="Username"]', 'fakeuser');
-        await page.fill('input[type="password"]', 'WrongPassword123');
-
-        // Submit
+        await page.fill('input[placeholder="Enter username"]', 'nobody_fake_xyz');
+        await page.fill('input[type="password"]', 'wrongpassword999');
         await page.click('button[type="submit"]');
-
-        // Expect error message to appear
-        // The error message might appear in a div with a specific class or we just check the body text
-        const errorAlert = page.locator('text=/Invalid login credentials/i');
-        await expect(errorAlert).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('text=/invalid login credentials/i')).toBeVisible({ timeout: 10000 });
     });
 
+    test('Valid credentials land on the dashboard', async ({ page }) => {
+        await loginAsAdmin(page);
+        await expect(page.locator('text=/Championship Standings/i').first()).toBeVisible();
+    });
+
+    test('Sign out returns to login', async ({ page }) => {
+        await loginAsAdmin(page);
+        await page.click('button:has-text("SIGNOUT")');
+        await expect(page).toHaveURL(/\/login/);
+    });
 });
