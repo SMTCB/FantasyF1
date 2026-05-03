@@ -48,16 +48,20 @@ async function syncRaceTimes() {
 
             const data = await res.json();
 
-            // Pick the session whose date_start is closest to the expected race date.
-            // This disambiguates countries that host multiple GPs (Spain, United States).
-            let session = data[0];
-            if (data.length > 1 && expectedDate) {
+            // Prefer the Grand Prix session (session_name === 'Race') over Sprint Race.
+            // Sprint weekends return both 'Sprint Race' and 'Race' for session_type=Race.
+            const gpSessions = data.filter(s => s.session_name === 'Race');
+            const candidates = gpSessions.length > 0 ? gpSessions : data;
+
+            // Disambiguate countries hosting multiple GPs by picking closest to expected date.
+            let session = candidates[0];
+            if (candidates.length > 1 && expectedDate) {
                 const target = new Date(expectedDate).getTime();
-                session = data.reduce((best, s) => {
+                session = candidates.reduce((best, s) => {
                     const diff = Math.abs(new Date(s.date_start).getTime() - target);
                     const bestDiff = Math.abs(new Date(best.date_start).getTime() - target);
                     return diff < bestDiff ? s : best;
-                }, data[0]);
+                }, candidates[0]);
             }
 
             if (session && session.date_start) {

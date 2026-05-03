@@ -36,16 +36,20 @@ export async function fetchRaceSession(
         const data: SessionInfo[] = await res.json();
         if (!data || data.length === 0) return null;
 
-        if (nearDate && data.length > 1) {
+        // Always prefer the Grand Prix race over Sprint Race
+        const gpSessions = data.filter((s: SessionInfo) => s.session_name === 'Race');
+        const candidates = gpSessions.length > 0 ? gpSessions : data;
+
+        if (nearDate && candidates.length > 1) {
             const target = new Date(nearDate).getTime();
-            return data.reduce((best, s) => {
+            return candidates.reduce((best, s) => {
                 const diff = Math.abs(new Date(s.date_start).getTime() - target);
                 const bestDiff = Math.abs(new Date(best.date_start).getTime() - target);
                 return diff < bestDiff ? s : best;
             });
         }
 
-        return data.find((s: SessionInfo) => s.session_name === 'Race') ?? data[0];
+        return candidates[0];
     } catch {
         return null;
     }
@@ -68,16 +72,20 @@ export async function fetchQualifyingSession(
         const data: SessionInfo[] = await res.json();
         if (!data || data.length === 0) return null;
 
-        if (nearDate && data.length > 1) {
+        // Prefer the Grand Prix qualifying over Sprint Qualifying
+        const qualSessions = data.filter((s: SessionInfo) => s.session_name === 'Qualifying');
+        const candidates = qualSessions.length > 0 ? qualSessions : data;
+
+        if (nearDate && candidates.length > 1) {
             const target = new Date(nearDate).getTime();
-            return data.reduce((best, s) => {
+            return candidates.reduce((best, s) => {
                 const diff = Math.abs(new Date(s.date_start).getTime() - target);
                 const bestDiff = Math.abs(new Date(best.date_start).getTime() - target);
                 return diff < bestDiff ? s : best;
             });
         }
 
-        return data[0];
+        return candidates[0];
     } catch {
         return null;
     }
