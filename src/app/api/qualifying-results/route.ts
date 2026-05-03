@@ -6,13 +6,15 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const round = Number(searchParams.get('round'));
 
+    const noCache = { headers: { 'Cache-Control': 'no-store' } };
+
     if (!round || round < 1 || round > 24) {
-        return NextResponse.json({ error: 'Invalid round number' }, { status: 400 });
+        return NextResponse.json({ error: 'Invalid round number' }, { status: 400, ...noCache });
     }
 
     const country = ROUND_TO_COUNTRY[round];
     if (!country) {
-        return NextResponse.json({ error: 'Country mapping not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Country mapping not found' }, { status: 404, ...noCache });
     }
 
     const race = CALENDAR.find(r => r.round === round);
@@ -21,10 +23,7 @@ export async function GET(request: NextRequest) {
         // 1. Get Qualifying Session Key — pass race date for multi-GP country disambiguation
         const session = await fetchQualifyingSession(2026, country, race?.date);
         if (!session) {
-            return NextResponse.json({
-                results: [],
-                status: 'Session not found for 2026 yet.'
-            });
+            return NextResponse.json({ results: [], status: 'Session not found for 2026 yet.' }, noCache);
         }
 
         // 2. Fetch official session results and driver info
@@ -34,10 +33,7 @@ export async function GET(request: NextRequest) {
         ]);
 
         if (!classification || classification.length === 0) {
-            return NextResponse.json({
-                results: [],
-                status: 'Qualifying in progress or results not yet available.'
-            });
+            return NextResponse.json({ results: [], status: 'Qualifying in progress or results not yet available.' }, noCache);
         }
 
         // 3. Process results - Sort by position
@@ -53,13 +49,10 @@ export async function GET(request: NextRequest) {
                 };
             });
 
-        return NextResponse.json({
-            results: grid,
-            status: 'Success'
-        });
+        return NextResponse.json({ results: grid, status: 'Success' }, noCache);
 
     } catch (error) {
         console.error('Qualifying fetch error:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500, ...noCache });
     }
 }

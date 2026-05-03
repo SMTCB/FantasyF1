@@ -9,13 +9,15 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const round = Number(searchParams.get('round'));
 
+    const noCache = { headers: { 'Cache-Control': 'no-store' } };
+
     if (!round || round < 1 || round > 24) {
-        return NextResponse.json({ error: 'Invalid round number' }, { status: 400 });
+        return NextResponse.json({ error: 'Invalid round number' }, { status: 400, ...noCache });
     }
 
     const race = CALENDAR.find(r => r.round === round);
     if (!race) {
-        return NextResponse.json({ error: 'Race not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Race not found' }, { status: 404, ...noCache });
     }
 
     const country = ROUND_TO_COUNTRY[round];
@@ -51,7 +53,7 @@ export async function GET(request: NextRequest) {
             sessionStart: sessionStart,
             isSaturday: race.isSaturday,
             source: dbRace?.session_start ? 'database' : 'openf1',
-        });
+        }, noCache);
     }
 
     // Fallback: use calendar data with estimated race time
@@ -69,5 +71,5 @@ export async function GET(request: NextRequest) {
         sessionStart: estimatedStart,
         isSaturday: race.isSaturday,
         source: 'fallback',
-    });
+    }, noCache);
 }
