@@ -116,7 +116,7 @@ export const CALENDAR: Race[] = [
 export const ROUND_TO_COUNTRY: Record<number, string> = {
     1: 'Australia', 2: 'China', 3: 'Japan', 4: 'United States',
     5: 'Canada', 6: 'Monaco', 7: 'Spain', 8: 'Austria',
-    9: 'Great Britain', 10: 'Belgium', 11: 'Hungary', 12: 'Netherlands',
+    9: 'United Kingdom', 10: 'Belgium', 11: 'Hungary', 12: 'Netherlands',
     13: 'Italy', 14: 'Spain', 15: 'Azerbaijan', 16: 'Singapore',
     17: 'United States', 18: 'Mexico', 19: 'Brazil', 20: 'United States',
     21: 'Qatar', 22: 'United Arab Emirates',
