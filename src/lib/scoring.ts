@@ -82,7 +82,9 @@ export function scoreRaceBet(bet: RaceBet, result: RaceResult): RaceScore {
     }
 
     // Team with most points
-    if (bet.teamMostPoints === result.teamMostPoints) {
+    // Result may be a comma-separated list when teams tie (e.g. "Red Bull,Ferrari"); any tied team is correct
+    const tiedTeams = result.teamMostPoints.split(',').map(s => s.trim()).filter(Boolean);
+    if (bet.teamMostPoints && tiedTeams.includes(bet.teamMostPoints)) {
         score.teamPoints = RACE_BET_SCORING.TEAM_MOST_POINTS;
     }
 

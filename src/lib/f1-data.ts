@@ -103,13 +103,14 @@ export const CALENDAR: Race[] = [
     { round: 13, gp: "Italian GP", date: "2026-09-06", circuit: "Monza", isSaturday: false, specialCategory: shuffledCategories[12] },
     { round: 14, gp: "Spanish GP (Madrid)", date: "2026-09-13", circuit: "Madrid (Debut)", isSaturday: false, specialCategory: shuffledCategories[13] },
     { round: 15, gp: "Azerbaijan GP", date: "2026-09-26", circuit: "Baku (Saturday)", isSaturday: true, specialCategory: shuffledCategories[14] },
-    { round: 16, gp: "Singapore GP", date: "2026-10-11", circuit: "Marina Bay", isSaturday: false, specialCategory: shuffledCategories[15] },
-    { round: 17, gp: "United States GP", date: "2026-10-25", circuit: "COTA", isSaturday: false, specialCategory: shuffledCategories[16] },
-    { round: 18, gp: "Mexico City GP", date: "2026-11-01", circuit: "Hermanos Rodríguez", isSaturday: false, specialCategory: shuffledCategories[17] },
-    { round: 19, gp: "São Paulo GP", date: "2026-11-08", circuit: "Interlagos", isSaturday: false, specialCategory: shuffledCategories[18] },
-    { round: 20, gp: "Las Vegas GP", date: "2026-11-21", circuit: "Las Vegas (Saturday)", isSaturday: true, specialCategory: shuffledCategories[19] },
-    { round: 21, gp: "Qatar GP", date: "2026-11-29", circuit: "Lusail", isSaturday: false, specialCategory: shuffledCategories[20] },
-    { round: 22, gp: "Abu Dhabi GP", date: "2026-12-06", circuit: "Yas Marina", isSaturday: false, specialCategory: shuffledCategories[21] },
+    { round: 16, gp: "Bahrain GP", date: "2026-10-04", circuit: "Sepang (Kuala Lumpur)", isSaturday: false, specialCategory: shuffledCategories[15] },
+    { round: 17, gp: "Singapore GP", date: "2026-10-11", circuit: "Marina Bay", isSaturday: false, specialCategory: shuffledCategories[15] },
+    { round: 18, gp: "United States GP", date: "2026-10-25", circuit: "COTA", isSaturday: false, specialCategory: shuffledCategories[16] },
+    { round: 19, gp: "Mexico City GP", date: "2026-11-01", circuit: "Hermanos Rodríguez", isSaturday: false, specialCategory: shuffledCategories[17] },
+    { round: 20, gp: "São Paulo GP", date: "2026-11-08", circuit: "Interlagos", isSaturday: false, specialCategory: shuffledCategories[18] },
+    { round: 21, gp: "Las Vegas GP", date: "2026-11-21", circuit: "Las Vegas (Saturday)", isSaturday: true, specialCategory: shuffledCategories[19] },
+    { round: 22, gp: "Qatar GP", date: "2026-11-29", circuit: "Lusail", isSaturday: false, specialCategory: shuffledCategories[20] },
+    { round: 23, gp: "Abu Dhabi GP", date: "2026-12-06", circuit: "Yas Marina", isSaturday: false, specialCategory: shuffledCategories[21] },
 ];
 
 
@@ -117,9 +118,9 @@ export const ROUND_TO_COUNTRY: Record<number, string> = {
     1: 'Australia', 2: 'China', 3: 'Japan', 4: 'United States',
     5: 'Canada', 6: 'Monaco', 7: 'Spain', 8: 'Austria',
     9: 'United Kingdom', 10: 'Belgium', 11: 'Hungary', 12: 'Netherlands',
-    13: 'Italy', 14: 'Spain', 15: 'Azerbaijan', 16: 'Singapore',
-    17: 'United States', 18: 'Mexico', 19: 'Brazil', 20: 'United States',
-    21: 'Qatar', 22: 'United Arab Emirates',
+    13: 'Italy', 14: 'Spain', 15: 'Azerbaijan', 16: 'Bahrain', 17: 'Singapore',
+    18: 'United States', 19: 'Mexico', 20: 'Brazil', 21: 'United States',
+    22: 'Qatar', 23: 'United Arab Emirates',
 };
 
 // Flatten all drivers with their team info

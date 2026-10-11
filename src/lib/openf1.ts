@@ -23,7 +23,9 @@ export async function fetchRaceSession(year: number, countryName: string): Promi
         );
         if (!res.ok) return null;
         const data: SessionInfo[] = await res.json();
-        return data.find((s: SessionInfo) => s.session_name === 'Race') || data[0] || null;
+        // Bahrain has a cancelled April session and the rescheduled October one; ignore cancelled ones
+        const active = data.filter((s: any) => !s.is_cancelled);
+        return active.find((s: SessionInfo) => s.session_name === 'Race') || active[0] || null;
     } catch {
         return null;
     }
